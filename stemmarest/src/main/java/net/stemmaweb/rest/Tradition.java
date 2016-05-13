@@ -27,7 +27,6 @@ import javax.ws.rs.core.Response.Status;
 import javax.xml.stream.XMLStreamException;
 
 import net.stemmaweb.model.RelationshipModel;
-import net.stemmaweb.model.TraditionMetadataModel;
 import net.stemmaweb.model.TraditionModel;
 import net.stemmaweb.model.WitnessModel;
 import net.stemmaweb.services.DatabaseService;
@@ -50,30 +49,32 @@ import com.sun.jersey.multipart.FormDataParam;
 
 
 /**
- * 
  * Comprises all the api calls related to a tradition.
- * 
+ * Can be called using http://BASE_URL/tradition
  * @author PSE FS 2015 Team2
- *
  */
+
 @Path("/tradition")
 public class Tradition implements IResource {
 	GraphDatabaseServiceProvider dbServiceProvider = new GraphDatabaseServiceProvider();
 	GraphDatabaseService db = dbServiceProvider.getDatabase();
 
 	/**
+	 * Changes the metadata of the tradition.
 	 * 
-	 * @param textInfo
+	 * @param traditionMetadata
 	 *            in JSON Format
-	 * @return OK on success or an ERROR as JSON
+	 * @return OK and information about the tradition in JSON on success or an
+	 *         ERROR in JSON format
 	 */
 	@POST
 	@Path("changemetadata/fromtradition/{tradId}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public Response changeOwnerOfATradition(TraditionMetadataModel textInfo, @PathParam("tradId") String witnessId) {
+	public Response changeTraditionMetadata(TraditionModel tradition,
+			@PathParam("tradId") String witnessId) {
 		
-		if (!DatabaseService.checkIfUserExists(textInfo.getOwnerId(),db)) {
+		if (!DatabaseService.checkIfUserExists(tradition.getOwnerId(), db)) {
 			return Response.status(Response.Status.NOT_FOUND).entity("Error: A user with this id does not exist")
 					.build();
 		}
@@ -91,9 +92,10 @@ public class Tradition implements IResource {
 				System.out.println(result.dumpToString());
 
 				// Add the new ownership
-				String createNewRelationQuery = "MATCH(user:USER {id:'" + textInfo.getOwnerId() + "'}) "
+				String createNewRelationQuery = "MATCH(user:USER {id:'" + tradition.getOwnerId() + "'}) "
 						+ "MATCH(tradition: TRADITION {id:'" + witnessId + "'}) " + "SET tradition.name = '"
-						+ textInfo.getName() + "' " + "SET tradition.public = '" + textInfo.getIsPublic() + "' "
+						+ tradition.getName() + "' " + "SET tradition.public = '"
+						+ tradition.getIsPublic() + "' "
 						+ "CREATE (tradition)<-[r:NORMAL]-(user) RETURN r, tradition";
 				result = engine.execute(createNewRelationQuery);
 				System.out.println(result.dumpToString());
@@ -107,13 +109,14 @@ public class Tradition implements IResource {
 		} catch (Exception e) {
 			return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
 		} 
-		return Response.status(Response.Status.OK).entity(textInfo).build();
+		return Response.ok(tradition).build();
 	}
 	
 	/**
 	 * Gets a list of all the complete traditions in the database.
 	 * 
-	 * @return
+	 * @return Http Response 200 and a list of tradition models in JSON on
+	 *         success or Http Response 500
 	 */
 	@GET
 	@Path("getalltraditions")
@@ -141,21 +144,22 @@ public class Tradition implements IResource {
 		} catch (Exception e) {
 			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
 		}
-		return Response.ok().entity(traditionList).build();
+		return Response.ok(traditionList).build();
 	}
 
 	/**
 	 * Gets a list of all the witnesses of a tradition with the given id.
 	 * 
 	 * @param tradId
-	 * @return
+	 * @return Http Response 200 and a list of witness models in JSON on success
+	 *         or an ERROR in JSON format
 	 */
 	@GET
 	@Path("getallwitnesses/fromtradition/{tradId}")
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response getAllWitnesses(@PathParam("tradId") String tradId) {
 
-		ArrayList<WitnessModel> witlist = new ArrayList<WitnessModel>();
+		ArrayList<WitnessModel> witnessList = new ArrayList<WitnessModel>();
 
 		ExecutionEngine engine = new ExecutionEngine(db);
 
@@ -179,11 +183,11 @@ public class Tradition implements IResource {
 					return Response.status(Status.NOT_FOUND).entity("start node not found").build();
 
 				for (Relationship rel : relationships) {
-					for (String id : ((String[]) rel.getProperty("lexemes"))) {
+					for (String id : ((String[]) rel.getProperty("witnesses"))) {
 						WitnessModel witM = new WitnessModel();
 						witM.setId(id);
 
-						witlist.add(witM);
+						witnessList.add(witM);
 					}
 				}
 
@@ -194,24 +198,22 @@ public class Tradition implements IResource {
 		} catch (Exception e) {
 			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
 		}
-		return Response.ok(witlist).build();
+		return Response.ok(witnessList).build();
 	}
 
 	/**
 	 * Gets a list of all relationships of a tradition with the given id.
 	 * 
 	 * @param tradId
-	 * @return
+	 * @return Http Response 200 and a list of relationship model in JSON
 	 */
 	@GET
-	@Path("getallrelationships/{tradId}")
+	@Path("getallrelationships/fromtradition/{tradId}")
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response getAllRelationships(@PathParam("tradId") String tradId) {
 
 		ArrayList<RelationshipModel> relList = new ArrayList<RelationshipModel>();
-
 		
-
 		try (Transaction tx = db.beginTx()) {
 
 			Node startNode = DatabaseService.getStartNode(tradId, db);
@@ -224,40 +226,7 @@ public class Tradition implements IResource {
 				Iterable<Relationship> rels = node.getRelationships(ERelations.RELATIONSHIP,Direction.OUTGOING);
 				for(Relationship rel : rels)
 				{
-					RelationshipModel relMod = new RelationshipModel();
-	
-					if (rel.getStartNode() != null)
-						relMod.setSource(String.valueOf(rel.getStartNode().getId()));
-					if (rel.getEndNode() != null)
-						relMod.setTarget(String.valueOf(rel.getEndNode().getId()));
-					relMod.setId(String.valueOf(rel.getId()));
-					if (rel.hasProperty("a_derivable_from_b"))
-						relMod.setA_derivable_from_b(rel.getProperty("a_derivable_from_b").toString());
-					if (rel.hasProperty("alters_meaning"))
-						relMod.setAlters_meaning(rel.getProperty("alters_meaning").toString());
-					if (rel.hasProperty("annotation"))
-						relMod.setAnnotation(rel.getProperty("annotation").toString());
-					if (rel.hasProperty("b_derivable_from_a"))
-						relMod.setB_derivable_from_a(rel.getProperty("b_derivable_from_a").toString());
-					if (rel.hasProperty("displayform"))
-						relMod.setDisplayform(rel.getProperty("displayform").toString());
-					if (rel.hasProperty("extra"))
-						relMod.setExtra(rel.getProperty("extra").toString());
-					if (rel.hasProperty("is_significant"))
-						relMod.setIs_significant(rel.getProperty("is_significant").toString());
-					if (rel.hasProperty("non_independent"))
-						relMod.setNon_independent(rel.getProperty("non_independent").toString());
-					if (rel.hasProperty("reading_a"))
-						relMod.setReading_a(rel.getProperty("reading_a").toString());
-					if (rel.hasProperty("reading_b"))
-						relMod.setReading_b(rel.getProperty("reading_b").toString());
-					if (rel.hasProperty("scope"))
-						relMod.setScope(rel.getProperty("scope").toString());
-					if (rel.hasProperty("type"))
-						relMod.setType(rel.getProperty("type").toString());
-					if (rel.hasProperty("witness"))
-						relMod.setWitness(rel.getProperty("witness").toString());
-	
+					RelationshipModel relMod = new RelationshipModel(rel);
 					relList.add(relMod);
 				}
 			}
@@ -268,13 +237,12 @@ public class Tradition implements IResource {
 		return Response.ok(relList).build();
 	}
 
-
 	/**
 	 * Helper method for getting the tradition node with a given tradition id
 	 * 
 	 * @param tradId
 	 * @param engine
-	 * @return
+	 * @return the root tradition node
 	 */
 	private Node getTraditionNode(String tradId, ExecutionEngine engine) {
 		ExecutionResult result = engine.execute("match (n:TRADITION {id: '" + tradId + "'}) return n");
@@ -302,8 +270,9 @@ public class Tradition implements IResource {
 	
 	/**
 	 * Removes a complete tradition
+	 * 
 	 * @param tradId
-	 * @return
+	 * @return http response
 	 */
 	@DELETE
 	@Path("deletetradition/withid/{tradId}")
@@ -360,7 +329,8 @@ public class Tradition implements IResource {
 	/**
 	 * Imports a tradition by given GraphML file and meta data
 	 *
-	 * @return String that will be returned as a text/plain response.
+	 * @return Http Response with the id of the imported tradition on success or
+	 *         an ERROR in JSON format
 	 * @throws XMLStreamException
 	 */
 	@POST
@@ -378,16 +348,13 @@ public class Tradition implements IResource {
 			return Response.status(Response.Status.CONFLICT).entity("Error: No user with this id exists").build();
 		}
 		
-
-		// Boolean is_public_bool = is_public.equals("on")? true : false;
 		String uploadedFileLocation = "upload/" + fileDetail.getFileName();
 
 		// save it
 		writeToFile(uploadedInputStream, uploadedFileLocation);
 
 		GraphMLToNeo4JParser parser = new GraphMLToNeo4JParser();
-		Response resp = parser.parseGraphML(uploadedFileLocation, userId);
-		// The prefix will always be some sort of '12_', to make sure that all
+		Response resp = parser.parseGraphML(uploadedFileLocation, userId,name);
 		// nodes are unique
 
 		deleteFile(uploadedFileLocation);
@@ -417,7 +384,6 @@ public class Tradition implements IResource {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-
 	}
 
 	/**

@@ -1,6 +1,7 @@
 package net.stemmaweb.rest;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -16,10 +17,14 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import net.stemmaweb.model.CharacterModel;
 import net.stemmaweb.model.DuplicateModel;
+import net.stemmaweb.model.GraphModel;
+import net.stemmaweb.model.KeyPropertyModel;
+import net.stemmaweb.model.ReadingChangePropertyModel;
 import net.stemmaweb.model.ReadingModel;
+import net.stemmaweb.model.RelationshipModel;
 import net.stemmaweb.services.DatabaseService;
-import net.stemmaweb.services.EvaluatorService;
 import net.stemmaweb.services.GraphDatabaseServiceProvider;
 import net.stemmaweb.services.ReadingService;
 import net.stemmaweb.services.RelationshipService;
@@ -34,24 +39,27 @@ import org.neo4j.graphdb.traversal.Evaluators;
 import org.neo4j.graphdb.traversal.Uniqueness;
 
 /**
- * 
- * Comprises all the api calls related to a reading.
+ * Comprises all Rest API calls related to a reading. Can be called via
+ * http://BASE_URL/reading
  * 
  * @author PSE FS 2015 Team2
- *
  */
+
 @Path("/reading")
 public class Reading implements IResource {
 
-	private String errorMessage;
+	private String errorMessage; // global error message used for submethod
+									// calls
+
 	GraphDatabaseServiceProvider dbServiceProvider = new GraphDatabaseServiceProvider();
 	GraphDatabaseService db = dbServiceProvider.getDatabase();
 
 	/**
-	 * Returns a single reading in a specific tradition.
+	 * Returns a single reading by global neo4j id
 	 * 
 	 * @param readId
-	 * @return
+	 *            to get the reading from the database
+	 * @return the reading fetched by the id
 	 */
 	@GET
 	@Path("getreading/withreadingid/{readId}")
@@ -68,50 +76,65 @@ public class Reading implements IResource {
 			tx.success();
 		} catch (Exception e) {
 			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
-		} finally {
-
 		}
 		return Response.ok(reading).build();
 	}
 
 	/**
-	 * change property of a reading according to their keys
+	 * Changes properties of a reading according to its keys
 	 * 
 	 * @param readId
-	 *            the id of the reading
-	 * @return response with the modified reading
+	 *            the id of the reading to be changed
+	 * @param changeModels
+	 *            an array of changeReadingModel objects. Will be converted from
+	 *            a json string. Example: a json string for an array size 1
+	 *            which should change the value of 'language' to 'german' will
+	 *            look like
+	 *            this:[{\"key\":\"language\",\"newProperty\":\"german\"}]
+	 * @return ok response with a model of the modified reading in json format
 	 */
 	@POST
-	@Consumes(MediaType.APPLICATION_JSON)
 	@Path("changeproperties/ofreading/{readId}")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
 	public Response changeReadingProperties(@PathParam("readId") long readId,
-			ChangePropertyModel changeModel) {
-
+			ReadingChangePropertyModel changeModels) {
+		ReadingModel modelToReturn = new ReadingModel();
 		Node reading;
 		try (Transaction tx = db.beginTx()) {
 			reading = db.getNodeById(readId);
-
-			if (!reading.hasProperty(changeModel.getKey()))
-				return Response.status(Status.INTERNAL_SERVER_ERROR)
-						.entity("the reading does not have such property")
-						.build();
-			else {
-				reading.setProperty(changeModel.getKey(),
-						changeModel.getNewProperty());
+			for (KeyPropertyModel keyPropertyModel : changeModels.getProperties()) {
+				if (!reading.hasProperty(keyPropertyModel.getKey()))
+					return Response
+							.status(Status.INTERNAL_SERVER_ERROR)
+							.entity("the reading does not have such property: '"
+									+ keyPropertyModel.getKey()
+									+ "'. no changes to the reading have been done")
+							.build();
 			}
-
+			for (KeyPropertyModel keyPropertyModel : changeModels.getProperties()) {
+				reading.setProperty(keyPropertyModel.getKey(),
+						keyPropertyModel.getProperty());
+			}
+			modelToReturn = new ReadingModel(reading);
 			tx.success();
 		} catch (Exception e) {
 			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
 		}
-		return Response.ok(reading).build();
+		return Response.status(Response.Status.OK).entity(modelToReturn)
+				.build();
 	}
 
 	/**
 	 * Duplicates a reading in a specific tradition. Opposite of merge
 	 * 
 	 * @param duplicateModel
-	 * @return
+	 *            a model in JSON containing the readings to be duplicated and
+	 *            the witnesses of the old readings which the duplicated new
+	 *            readings should now belong to
+	 * @return a GraphModel in JSON containing all the created readings and the
+	 *         deleted relationships on success or Status.INTERNAL_SERVER_ERROR
+	 *         with a detailed message else
 	 */
 	@POST
 	@Path("duplicatereading")
@@ -120,6 +143,7 @@ public class Reading implements IResource {
 	public Response duplicateReading(DuplicateModel duplicateModel) {
 
 		ArrayList<ReadingModel> createdReadings = new ArrayList<ReadingModel>();
+		ArrayList<RelationshipModel> deletedRelationships = null;
 
 		Node originalReading = null;
 
@@ -129,66 +153,71 @@ public class Reading implements IResource {
 				originalReading = db.getNodeById(readId);
 				List<String> newWitnesses = duplicateModel.getWitnesses();
 
-				if (cannotBeDuplicated(originalReading, newWitnesses))
+				if (!canBeDuplicated(originalReading, newWitnesses))
 					return Response.status(Status.INTERNAL_SERVER_ERROR)
 							.entity(errorMessage).build();
 
 				Node newNode = db.createNode();
-				duplicate(newWitnesses, originalReading, newNode);
+				deletedRelationships = duplicate(newWitnesses, originalReading,
+						newNode);
 				createdReadings.add(new ReadingModel(newNode));
 			}
 
 			tx.success();
 		} catch (Exception e) {
 			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
-		} finally {
-
 		}
-		return Response.ok(createdReadings).build();
+		GraphModel readingsAndRelationships = new GraphModel(createdReadings,
+				deletedRelationships);
+		return Response.ok(readingsAndRelationships).build();
 	}
 
 	/**
-	 * Checks if the reading can be duplicated for the given witness list
+	 * Checks if the reading can be duplicated for the given witness list. Sets
+	 * the global error message if not.
 	 * 
 	 * @param originalReading
+	 *            the reading to be duplicated
 	 * @param newWitnesses
-	 * @return
+	 *            the witnesses the duplicated reading will belong to
+	 * @return true if specific reading can be duplicated, false else
 	 */
-	private boolean cannotBeDuplicated(Node originalReading,
+	private boolean canBeDuplicated(Node originalReading,
 			List<String> newWitnesses) {
 		List<String> allWitnesses = allWitnessesOfReading(originalReading);
 
 		if (newWitnesses.isEmpty()) {
 			errorMessage = "The witness list has to contain at least one witness";
-			return true;
+			return false;
 		}
 
 		for (String newWitness : newWitnesses)
 			if (!allWitnesses.contains(newWitness)) {
 				errorMessage = "The reading has to be in the witnesses to be duplicated";
-				return true;
+				return false;
 			}
 
 		if (allWitnesses.size() < 2) {
 			errorMessage = "The reading has to be in at least two witnesses";
-			return true;
+			return false;
 		}
 
-		return false;
+		return true;
 	}
 
 	/**
-	 * Gets all the witnesses of a reading in all its normal relationships.
+	 * Gets all witnesses of a reading in all its normal relationships.
 	 * 
 	 * @param originalReading
-	 * @return
+	 *            the reading to be duplicated
+	 * @return the list of witnesses of a reading
 	 */
 	private List<String> allWitnessesOfReading(Node originalReading) {
 		List<String> allWitnesses = new LinkedList<String>();
 		String[] currentWitnesses;
 		for (Relationship relationship : originalReading
 				.getRelationships(ERelations.NORMAL)) {
-			currentWitnesses = (String[]) relationship.getProperty("lexemes");
+			currentWitnesses = (String[]) relationship.getProperty("witnesses");
 			for (String currentWitness : currentWitnesses)
 				if (!allWitnesses.contains(currentWitness))
 					allWitnesses.add(currentWitness);
@@ -200,11 +229,16 @@ public class Reading implements IResource {
 	 * Performs all necessary steps in the database to duplicate the reading.
 	 * 
 	 * @param newWitnesses
+	 *            : the new witnesses to be split from the original path
 	 * @param originalReading
+	 *            : the reading to be duplicated
 	 * @param addedReading
+	 *            : the newly duplicated reading
+	 * @return a list of the deleted relationships
 	 */
-	private void duplicate(List<String> newWitnesses, Node originalReading,
-			Node addedReading) {
+	private ArrayList<RelationshipModel> duplicate(List<String> newWitnesses,
+			Node originalReading, Node addedReading) {
+		ArrayList<RelationshipModel> deletedRelationships = new ArrayList<RelationshipModel>();
 		// copy reading properties to newly added reading
 		addedReading = ReadingService.copyReadingProperties(originalReading,
 				addedReading);
@@ -223,15 +257,19 @@ public class Reading implements IResource {
 		// Incoming
 		for (Relationship originalRelationship : originalReading
 				.getRelationships(ERelations.NORMAL, Direction.INCOMING))
-			transferNewWitnessesFromOriginalReadingToAddedReading(newWitnesses,
-					originalRelationship, originalRelationship.getStartNode(),
-					addedReading);
+			deletedRelationships
+					.addAll(transferNewWitnessesFromOriginalReadingToAddedReading(
+							newWitnesses, originalRelationship,
+							originalRelationship.getStartNode(), addedReading));
 		// Outgoing
 		for (Relationship originalRelationship : originalReading
 				.getRelationships(ERelations.NORMAL, Direction.OUTGOING))
-			transferNewWitnessesFromOriginalReadingToAddedReading(newWitnesses,
-					originalRelationship, addedReading,
-					originalRelationship.getEndNode());
+			deletedRelationships
+					.addAll(transferNewWitnessesFromOriginalReadingToAddedReading(
+							newWitnesses, originalRelationship, addedReading,
+							originalRelationship.getEndNode()));
+
+		return deletedRelationships;
 	}
 
 	/**
@@ -239,14 +277,17 @@ public class Reading implements IResource {
 	 * reading to the relationships of the newly added reading.
 	 * 
 	 * @param newWitnesses
+	 *            the witnesses the duplicated reading will belong to
 	 * @param originalRel
 	 * @param originNode
 	 * @param targetNode
+	 * @return a list of the deleted edges
 	 */
-	private void transferNewWitnessesFromOriginalReadingToAddedReading(
+	private ArrayList<RelationshipModel> transferNewWitnessesFromOriginalReadingToAddedReading(
 			List<String> newWitnesses, Relationship originalRel,
 			Node originNode, Node targetNode) {
-		String[] oldWitnesses = (String[]) originalRel.getProperty("lexemes");
+		ArrayList<RelationshipModel> deletedRelationships = new ArrayList<RelationshipModel>();
+		String[] oldWitnesses = (String[]) originalRel.getProperty("witnesses");
 		// if oldWitnesses only contains one witness and this one should be
 		// duplicated, create new relationship for addedReading and delete
 		// the one from the originalReading
@@ -254,13 +295,14 @@ public class Reading implements IResource {
 			if (newWitnesses.contains(oldWitnesses[0])) {
 				Relationship newRel = originNode.createRelationshipTo(
 						targetNode, ERelations.NORMAL);
-				newRel.setProperty("lexemes", oldWitnesses);
+				newRel.setProperty("witnesses", oldWitnesses);
+				deletedRelationships.add(new RelationshipModel(originalRel));
 				originalRel.delete();
 			}
 			// if oldWitnesses contains more than one witnesses, create new
 			// relationship and add those witnesses which should be duplicated
 		} else {
-			// add only those witnesses to oldWitnesses which are
+			// add only those old witnesses to stayingWitnessess which are
 			// not in newWitnesses
 			ArrayList<String> remainingWitnesses = new ArrayList<String>();
 			ArrayList<String> stayingWitnesses = new ArrayList<String>();
@@ -270,17 +312,27 @@ public class Reading implements IResource {
 				else
 					remainingWitnesses.add(oldWitness);
 
-			Relationship addedRelationship = originNode.createRelationshipTo(
-					targetNode, ERelations.NORMAL);
-			addedRelationship.setProperty("lexemes", remainingWitnesses
-					.toArray(new String[remainingWitnesses.size()]));
+			// create new relationship for remaining witnesses if there are any
+			if (!remainingWitnesses.isEmpty()) {
+				Relationship addedRelationship = originNode
+						.createRelationshipTo(targetNode, ERelations.NORMAL);
+				Collections.sort(remainingWitnesses);
+				addedRelationship.setProperty("witnesses", remainingWitnesses
+						.toArray(new String[remainingWitnesses.size()]));
 
-			if (stayingWitnesses.isEmpty())
-				originalRel.delete();
-			else
-				originalRel.setProperty("lexemes", stayingWitnesses
-						.toArray(new String[stayingWitnesses.size()]));
+				if (stayingWitnesses.isEmpty()) {
+					deletedRelationships
+							.add(new RelationshipModel(originalRel));
+					originalRel.delete();
+				} else {
+					Collections.sort(stayingWitnesses);
+					originalRel.setProperty("witnesses", stayingWitnesses
+							.toArray(new String[stayingWitnesses.size()]));
+				}
+			}
 		}
+
+		return deletedRelationships;
 	}
 
 	/**
@@ -288,8 +340,11 @@ public class Reading implements IResource {
 	 * Opposite of duplicate
 	 * 
 	 * @param firstReadId
+	 *            the id of the first reading to be merged
 	 * @param secondReadId
-	 * @return
+	 *            the id of the second reading to be merged
+	 * @return Status.ok if the merge was successful.
+	 *         Status.INTERNAL_SERVER_ERROR with a detailed message if not
 	 */
 	@POST
 	@Path("mergereadings/first/{firstReadId}/second/{secondReadId}")
@@ -304,94 +359,96 @@ public class Reading implements IResource {
 			stayingReading = db.getNodeById(firstReadId);
 			deletingReading = db.getNodeById(secondReadId);
 
-			if (cannotBeMerged(db, stayingReading, deletingReading))
+			if (!canBeMerged(stayingReading, deletingReading))
 				return Response.status(Status.INTERNAL_SERVER_ERROR)
 						.entity(errorMessage).build();
-
-			// finally merge readings ;-)
 			merge(stayingReading, deletingReading);
 
 			tx.success();
 		} catch (Exception e) {
 			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
-		} finally {
-
 		}
 		return Response.ok().build();
 	}
 
 	/**
-	 * Checks if the two readings can be merged or not.
+	 * Checks if the two readings can be merged or not. Sets the global error
+	 * message if not.
 	 * 
-	 * @param db
 	 * @param stayingReading
+	 *            the reading which stays in the database
 	 * @param deletingReading
-	 * @return
+	 *            the reading which will be deleted from the database
+	 * @return true if readings can be merged, false if not
 	 */
-	private boolean cannotBeMerged(GraphDatabaseService db,
-			Node stayingReading, Node deletingReading) {
-		if (doNotContainSameText(stayingReading, deletingReading)) {
+	private boolean canBeMerged(Node stayingReading, Node deletingReading) {
+		if (!doContainSameText(stayingReading, deletingReading)) {
 			errorMessage = "Readings to be merged do not contain the same text";
-			return true;
+			return false;
 		}
 
-		if (doNotContainRelationshipBetweenEachOther(stayingReading,
+		if (!doContainRelationshipBetweenEachOther(stayingReading,
 				deletingReading)) {
 			errorMessage = "Readings to be merged have to be connected with each other through a relationship";
-			return true;
+			return false;
 		}
 
 		if (containClassTwoRelationships(stayingReading, deletingReading)) {
 			errorMessage = "Readings to be merged cannot contain class 2 relationships (transposition / repetition)";
-			return true;
+			return false;
 		}
 
 		if (ReadingService.wouldGetCyclic(db, stayingReading, deletingReading)) {
 			errorMessage = "Readings to be merged would make the graph cyclic";
-			return true;
+			return false;
 		}
 
-		return false;
+		return true;
 	}
 
 	/**
 	 * Checks if the two readings contain the same text or not.
 	 * 
 	 * @param stayingReading
+	 *            the reading which stays in the database
 	 * @param deletingReading
-	 * @return
+	 *            the reading which will be deleted from the database
+	 * @return true if they contain the same text
 	 */
-	private boolean doNotContainSameText(Node stayingReading,
-			Node deletingReading) {
-		return !stayingReading.getProperty("text").toString()
+	private boolean doContainSameText(Node stayingReading, Node deletingReading) {
+		return stayingReading.getProperty("text").toString()
 				.equals(deletingReading.getProperty("text").toString());
 	}
 
 	/**
-	 * Checks if the two readings have a relationship between each other.
+	 * Checks if the two readings have a relationship between them.
 	 * 
 	 * @param stayingReading
+	 *            the reading which stays in the database
 	 * @param deletingReading
-	 * @return
+	 *            the reading which will be deleted from the database
+	 * @return check whether two readings contain a relationship between them
 	 */
-	private boolean doNotContainRelationshipBetweenEachOther(
-			Node stayingReading, Node deletingReading) {
+	private boolean doContainRelationshipBetweenEachOther(Node stayingReading,
+			Node deletingReading) {
 		for (Relationship firstRel : stayingReading
 				.getRelationships(ERelations.RELATIONSHIP))
 			for (Relationship secondRel : deletingReading
 					.getRelationships(ERelations.RELATIONSHIP))
 				if (firstRel.equals(secondRel))
-					return false;
-		return true;
+					return true;
+		return false;
 	}
 
 	/**
-	 * Checks if the two readings have a relationship between each other which
-	 * is of class two (transposition / repetition).
+	 * Checks if the two readings have a relationship between them which is of
+	 * class two (transposition / repetition).
 	 * 
 	 * @param stayingReading
+	 *            the reading which stays in the database
 	 * @param deletingReading
-	 * @return
+	 *            the reading which will be deleted from the database
+	 * @return true if a relationship between two readings is of class 2
 	 */
 	private boolean containClassTwoRelationships(Node stayingReading,
 			Node deletingReading) {
@@ -409,7 +466,9 @@ public class Reading implements IResource {
 	 * one.
 	 * 
 	 * @param stayingReading
+	 *            the reading which stays in the database
 	 * @param deletingReading
+	 *            the reading which will be deleted from the database
 	 */
 	private void merge(Node stayingReading, Node deletingReading) {
 		deleteRelationshipBetweenReadings(stayingReading, deletingReading);
@@ -423,7 +482,9 @@ public class Reading implements IResource {
 	 * Deletes the relationship between the two readings.
 	 * 
 	 * @param stayingReading
+	 *            the reading which stays in the database
 	 * @param deletingReading
+	 *            the reading which will be deleted from the database
 	 */
 	private void deleteRelationshipBetweenReadings(Node stayingReading,
 			Node deletingReading) {
@@ -440,22 +501,23 @@ public class Reading implements IResource {
 	 * reading.
 	 * 
 	 * @param stayingReading
+	 *            the reading which stays in the database
 	 * @param deletingReading
+	 *            the reading which will be deleted from the database
 	 */
 	private void copyWitnesses(Node stayingReading, Node deletingReading,
 			Direction direction) {
 		for (Relationship stayingRel : stayingReading.getRelationships(
-				ERelations.NORMAL, direction))
+				ERelations.NORMAL, direction)) {
 			for (Relationship deletingRel : deletingReading.getRelationships(
 					ERelations.NORMAL, direction)) {
-				// if (!firstRel.equals(secondRel))
-				if (stayingRel.getOtherNode(stayingReading).equals(
-						deletingRel.getOtherNode(deletingReading))) {
+				if (stayingRel.getOtherNode(stayingReading).getId() == (deletingRel
+						.getOtherNode(deletingReading).getId())) {
 					// get Witnesses
 					String[] stayingReadingWitnesses = (String[]) stayingRel
-							.getProperty("lexemes");
+							.getProperty("witnesses");
 					String[] deletingReadingWitnesses = (String[]) deletingRel
-							.getProperty("lexemes");
+							.getProperty("witnesses");
 
 					// combine witness lists into one list
 					String[] combinedWitnesses = new String[stayingReadingWitnesses.length
@@ -464,25 +526,35 @@ public class Reading implements IResource {
 						combinedWitnesses[i] = stayingReadingWitnesses[i];
 					for (int i = 0; i < deletingReadingWitnesses.length; i++)
 						combinedWitnesses[stayingReadingWitnesses.length + i] = deletingReadingWitnesses[i];
-					stayingRel.setProperty("lexemes", combinedWitnesses);
-
-				} else {
-					Relationship newRel = stayingReading.createRelationshipTo(
-							deletingRel.getOtherNode(deletingReading),
-							ERelations.NORMAL);
-					newRel.setProperty("lexemes",
-							deletingRel.getProperty("lexemes"));
+					Arrays.sort(combinedWitnesses);
+					stayingRel.setProperty("witnesses", combinedWitnesses);
+					deletingRel.delete();
 				}
-				deletingRel.delete();
 			}
+		}
+		for (Relationship deletingRel : deletingReading.getRelationships(
+				ERelations.NORMAL, direction)) {
+			Relationship newRel;
+			if (direction.equals(Direction.OUTGOING))
+				newRel = stayingReading.createRelationshipTo(
+						deletingRel.getOtherNode(deletingReading),
+						ERelations.NORMAL);
+			else
+				newRel = deletingRel
+						.getOtherNode(deletingReading)
+						.createRelationshipTo(stayingReading, ERelations.NORMAL);
+			newRel.setProperty("witnesses", deletingRel.getProperty("witnesses"));
+			deletingRel.delete();
+		}		
 	}
 
 	/**
-	 * Adds the relationships from the reading to be deleted to the staying
-	 * reading.
+	 * Adds relationships from deletedReading to staying reading.
 	 * 
 	 * @param stayingReading
+	 *            the reading which stays in the database
 	 * @param deletingReading
+	 *            the reading which will be deleted from the database
 	 */
 	private void addRelationshipsToStayingReading(Node stayingReading,
 			Node deletingReading) {
@@ -510,93 +582,121 @@ public class Reading implements IResource {
 	 * Opposite of compress
 	 * 
 	 * @param readId
-	 * @param separator
-	 *            the string which is between the words to be splitted, default:
-	 *            whitespace
+	 *            the id of the reading to be split
 	 * @param splitIndex
-	 *            the index of the first letter of second word: "unto" with
-	 *            index 2 gets "un" and "to" if the index is zero the reading is
-	 *            splitted using the separator
-	 * @return
+	 *            the index of the first letter of the second word: "unto" with
+	 *            index 2 gets "un" and "to". if the index is zero the reading
+	 *            is split using the separator
+	 * @param separator
+	 *            the string which is between the words to be split, if no
+	 *            separator is specified (empty String) the reading is split
+	 *            using whitespace as default. If a splitIndex and a separator
+	 *            were specified the reading is split using the splitIndex and
+	 *            removing the separator from the beginning of the second word.
+	 *            Is given as a String to avoid problems with 'unsafe'
+	 *            characters in the URL
+	 * @return a GraphModel in JSON containing all the created and modified
+	 *         readings and the deleted relationships on success or
+	 *         Status.INTERNAL_SERVER_ERROR with a detailed message else
 	 */
 	@POST
-	@Path("splitreading/ofreading/{readId}/{separator}/{splitIndex}")
+	@Path("splitreading/ofreading/{readId}/withsplitindex/{splitIndex}")
+	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public Response splitReading(@PathParam("readId") long readId, @PathParam("separator") String separator,
-			@PathParam("splitIndex") int splitIndex) {
-
-		ArrayList<ReadingModel> createdNodes = null;
-		Node originalReading = null;
-
+	public Response splitReading(@PathParam("readId") long readId,
+			@PathParam("splitIndex") int splitIndex, CharacterModel model) {
+		assert (model != null);
+		GraphModel readingsAndRelationships = null;
+		Node originalReading = null;		
 		try (Transaction tx = db.beginTx()) {
 			originalReading = db.getNodeById(readId);
-			String originalText = originalReading.getProperty("text").toString();
-			String[] splittedWords;
-			if (splitIndex > 0) {
-				if(splitIndex >= originalText.length())
-					return Response.status(Status.INTERNAL_SERVER_ERROR)
-							.entity("The splitIndex must be smaller than the text length").build();
-				splittedWords = new String[2];
-				splittedWords[0] = originalText.substring(0, splitIndex);
-				splittedWords[1] = originalText.substring(splitIndex);
-			}
-			else {
-				if (separator == null || separator.equals("") || separator.equals("0"))
-					separator = "\\s+";
-				splittedWords = originalText.split(separator);
-			}
+			String originalText = originalReading.getProperty("text")
+					.toString();
+			if (splitIndex >= originalText.length())
+				return Response
+						.status(Status.INTERNAL_SERVER_ERROR)
+						.entity("The index must be smaller than the text length")
+						.build();
 
-			if (cannotBeSplitted(originalReading, splittedWords))
+			if (!originalText.contains(model.getCharacter()))
 				return Response.status(Status.INTERNAL_SERVER_ERROR)
-						.entity(errorMessage).build();
+						.entity("no such separator exists").build();				
 
-			createdNodes = split(db, originalReading, splittedWords);
+			if (splitIndex != 0 && !model.getCharacter().equals("")) {
+				String textToRemove = originalText.substring(splitIndex,
+						splitIndex + model.getCharacter().length());
+				if (!textToRemove.equals(model.getCharacter()))
+					return Response
+							.status(Status.INTERNAL_SERVER_ERROR)
+							.entity("The separator does not apear in the index location in the text")
+							.build();
+			}
+
+			if (originalReading.hasRelationship(ERelations.RELATIONSHIP))
+				return Response
+						.status(Status.INTERNAL_SERVER_ERROR)
+						.entity("A reading to be split cannot be part of any relationship")
+						.build();
+
+			String[] splitWords = splitUpText(splitIndex, model.getCharacter(),
+					originalText);
+
+			if (!hasRankGap(originalReading, splitWords.length)) {
+				return Response
+						.status(Status.INTERNAL_SERVER_ERROR)
+						.entity("There has to be a rank-gap after a reading to be split")
+						.build();
+			}
+
+			readingsAndRelationships = split(originalReading, splitWords);
 
 			tx.success();
 		} catch (Exception e) {
 			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
-		} finally {
-
 		}
-		return Response.ok(createdNodes).build();
+		return Response.ok(readingsAndRelationships).build();
 	}
 
 	/**
-	 * Checks if a reading can be splitted or not.
+	 * Splits up the text of the reading into the words.
 	 * 
-	 * @param originalReading
-	 * @param splittedWords
-	 * @return
+	 * @param splitIndex
+	 *            the index of the first letter of the second word
+	 * @param separator
+	 *            the string between the words
+	 * @param originalText
+	 *            the text to be split up
+	 * @return an array containing the separated words
 	 */
-	private boolean cannotBeSplitted(Node originalReading,
-			String[] splittedWords) {
-		if (splittedWords.length < 2) {
-			errorMessage = "A reading to be splitted has to contain at least 2 words";
-			return true;
+	private String[] splitUpText(int splitIndex, String separator,
+			String originalText) {
+		String[] splitWords;
+		if (splitIndex > 0) {
+			splitWords = new String[2];
+			splitWords[0] = originalText.substring(0, splitIndex);
+			splitWords[1] = originalText.substring(splitIndex);
+			// remove separator from second word if there was one specified
+			if (separator != null || separator != "")
+				splitWords[1] = splitWords[1].substring(separator.length());
+		} else {
+			if (separator.equals(""))
+				separator = "\\s+";
+			splitWords = originalText.split(separator);
 		}
-
-		if (originalReading.hasRelationship(ERelations.RELATIONSHIP)) {
-			errorMessage = "A reading to be splitted cannot be part of any relationship";
-			return true;
-		}
-
-		if (!hasRankGap(originalReading, splittedWords.length)) {
-			errorMessage = "There has to be a rank-gap after a reading to be splitted";
-			return true;
-		}
-
-		return false;
+		return splitWords;
 	}
 
 	/**
-	 * Checks if there is a rank gap after the reading to be splitted. The rank
-	 * gap has to have at least the size of the readings words. E.g. if the
-	 * reading is "the little mouse" and has rank 5 the next reading has to have
-	 * at least rank 8.
+	 * Checks if there is a rank gap after the reading to be split. The rank gap
+	 * has to have at least the size of the readings words. E.g. if the reading
+	 * is "the little mouse" and has rank 5 the next reading has to have at
+	 * least rank 8.
 	 * 
 	 * @param originalReading
+	 *            the reading to be split
 	 * @param numberOfWords
-	 * @return
+	 *            the number of words the reading to be split contains
+	 * @return true if there is a rank gap
 	 */
 	private boolean hasRankGap(Node originalReading, int numberOfWords) {
 		String rankKey = "rank";
@@ -616,65 +716,72 @@ public class Reading implements IResource {
 	/**
 	 * Performs all necessary steps in the database to split the reading.
 	 * 
-	 * @param db
 	 * @param originalReading
-	 * @param splittedWords
-	 * @return
+	 *            the reading to be split
+	 * @param splitWords
+	 *            the words the reading consists of
+	 * @return a model of the split graph
 	 */
-	private ArrayList<ReadingModel> split(GraphDatabaseService db,
-			Node originalReading, String[] splittedWords) {
-		Iterable<Relationship> originalOutgoingRels = originalReading.getRelationships(ERelations.NORMAL,
-				Direction.OUTGOING);
+	private GraphModel split(Node originalReading, String[] splitWords) {
+		ArrayList<ReadingModel> createdOrChangedReadings = new ArrayList<ReadingModel>();
+		ArrayList<RelationshipModel> deletedRelationships = new ArrayList<RelationshipModel>();
+
+		Iterable<Relationship> originalOutgoingRels = originalReading
+				.getRelationships(ERelations.NORMAL, Direction.OUTGOING);
 		ArrayList<String> allWitnesses = new ArrayList<String>();
-		for (Relationship relationship : originalReading.getRelationships(ERelations.NORMAL, Direction.INCOMING)) {
-			String[] witnesses = (String[]) relationship.getProperty("lexemes");
+		for (Relationship relationship : originalReading.getRelationships(
+				ERelations.NORMAL, Direction.INCOMING)) {
+			String[] witnesses = (String[]) relationship.getProperty("witnesses");
 			for (int j = 0; j < witnesses.length; j++)
 				allWitnesses.add(witnesses[j]);
 
 		}
-		originalReading.setProperty("text", splittedWords[0]);
+		originalReading.setProperty("text", splitWords[0]);
 
-
-		ArrayList<ReadingModel> createdNodes = new ArrayList<ReadingModel>();
-		createdNodes.add(new ReadingModel(originalReading));
-		
+		createdOrChangedReadings.add(new ReadingModel(originalReading));
 
 		Node lastReading = originalReading;
 
-		for (int i = 1; i < splittedWords.length; i++) {
+		for (int i = 1; i < splitWords.length; i++) {
 			Node newReading = db.createNode();
 
-			newReading = ReadingService.copyReadingProperties(lastReading, newReading);
-			newReading.setProperty("text", splittedWords[i]);
+			newReading = ReadingService.copyReadingProperties(lastReading,
+					newReading);
+			newReading.setProperty("text", splitWords[i]);
 			Long previousRank = (Long) lastReading.getProperty("rank");
 			newReading.setProperty("rank", previousRank + 1);
 
 			Relationship relationship = lastReading.createRelationshipTo(
 					newReading, ERelations.NORMAL);
-			relationship.setProperty("lexemes",
+			Collections.sort(allWitnesses);
+			relationship.setProperty("witnesses",
 					allWitnesses.toArray(new String[allWitnesses.size()]));
 
 			lastReading = newReading;
-			createdNodes.add(new ReadingModel(newReading));
+			createdOrChangedReadings.add(new ReadingModel(newReading));
 		}
 		for (Relationship oldRel : originalOutgoingRels) {
-			Relationship newRel = lastReading.createRelationshipTo(oldRel.getEndNode(), ERelations.NORMAL);
-			newRel = RelationshipService.copyRelationshipProperties(oldRel, newRel);
+			Relationship newRel = lastReading.createRelationshipTo(
+					oldRel.getEndNode(), ERelations.NORMAL);
+			newRel = RelationshipService.copyRelationshipProperties(oldRel,
+					newRel);
+			deletedRelationships.add(new RelationshipModel(oldRel));
 			oldRel.delete();
 		}
 
-		return createdNodes;
+		return new GraphModel(createdOrChangedReadings, deletedRelationships);
 	}
 
 	/**
 	 * gets the next readings from a given readings in the same witness
 	 * 
 	 * @param witnessId
-	 *            : witness id
+	 *            : the id (name) of the witness
 	 * @param readId
-	 *            : reading id
+	 *            : the id of the reading
 	 * 
-	 * @return the requested reading
+	 * @return http.ok and a model of the requested reading in json on success
+	 *         or an ERROR in JSON format
 	 */
 	@GET
 	@Path("getnextreading/fromwitness/{witnessId}/ofreading/{readId}")
@@ -685,8 +792,7 @@ public class Reading implements IResource {
 
 		final String WITNESS_ID = witnessId;
 
-		Evaluator witnessEvaluator = EvaluatorService
-				.getEvalForWitness(WITNESS_ID);
+		Evaluator witnessEvaluator = Witness.getEvalForWitness(WITNESS_ID);
 
 		try (Transaction tx = db.beginTx()) {
 			Node reading = db.getNodeById(readId);
@@ -707,22 +813,21 @@ public class Reading implements IResource {
 			}
 		} catch (Exception e) {
 			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
-		} finally {
-
 		}
 		return Response.status(Status.NOT_FOUND)
 				.entity("given readings not found").build();
 	}
 
 	/**
-	 * gets the next readings from a given readings in the same witness
+	 * gets the previous readings from a given readings in the same witness
 	 * 
 	 * @param witnessId
-	 *            : witness id
+	 *            : the id (name) of the witness
 	 * @param readId
-	 *            : reading id
+	 *            : the id of the reading
 	 * 
-	 * @return the requested reading
+	 * @return http.ok and a model of the requested reading in json on success
+	 *         or an ERROR in JSON format
 	 */
 	@GET
 	@Path("getpreviousreading/fromwitness/{witnessId}/ofreading/{readId}")
@@ -733,8 +838,7 @@ public class Reading implements IResource {
 
 		final String WITNESS_ID = witnessId;
 
-		Evaluator wintessEvaluator = EvaluatorService
-				.getEvalForWitness(WITNESS_ID);
+		Evaluator wintessEvaluator = Witness.getEvalForWitness(WITNESS_ID);
 
 		try (Transaction tx = db.beginTx()) {
 			Node read = db.getNodeById(readId);
@@ -755,13 +859,19 @@ public class Reading implements IResource {
 			}
 		} catch (Exception e) {
 			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
-		} finally {
-
 		}
 		return Response.status(Status.NOT_FOUND)
 				.entity("given readings not found").build();
 	}
 
+	/**
+	 * Returns a list of all readings in a tradition
+	 * 
+	 * @param tradId
+	 *            the id of the tradition
+	 * @return the list of readings in json format on success or an ERROR in
+	 *         JSON format
+	 */
 	@GET
 	@Path("getallreadings/fromtradition/{tradId}")
 	@Produces(MediaType.APPLICATION_JSON)
@@ -775,35 +885,82 @@ public class Reading implements IResource {
 					.entity("Could not find tradition with this id").build();
 		}
 		try (Transaction tx = db.beginTx()) {
-			readingModels = getAllReadingsFromTradition(startNode, db);
+			for (Node node : db.traversalDescription().depthFirst()
+					.relationships(ERelations.NORMAL, Direction.OUTGOING)
+					.evaluator(Evaluators.all())
+					.uniqueness(Uniqueness.NODE_GLOBAL).traverse(startNode)
+					.nodes()) {
+				ReadingModel tempReading = new ReadingModel(node);
+				readingModels.add(tempReading);
+			}
 			tx.success();
 		} catch (Exception e) {
 			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
-		} finally {
-
 		}
 		return Response.ok(readingModels).build();
 	}
 
-	private ArrayList<ReadingModel> getAllReadingsFromTradition(Node startNode,
-			GraphDatabaseService db) {
+	/**
+	 * Get all readings which have the same text and the same rank between given
+	 * ranks
+	 * 
+	 * @param tradId
+	 *            the id of the tradition in which to look for identical
+	 *            readings
+	 * @param startRank
+	 *            the rank from where to start the search
+	 * @param endRank
+	 *            the end rank of the search range
+	 * @return a list of lists as a json ok response: each list contain
+	 *         identical readings on success or an ERROR in JSON format
+	 */
+	@GET
+	@Path("getidenticalreadings/fromtradition/{tradId}/fromstartrank/{startRank}/toendrank/{endRank}")
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response getIdenticalReadings(@PathParam("tradId") String tradId,
+			@PathParam("startRank") long startRank,
+			@PathParam("endRank") long endRank) {
 
 		ArrayList<ReadingModel> readingModels = new ArrayList<ReadingModel>();
 
-		for (Node node : db.traversalDescription().depthFirst()
-				.relationships(ERelations.NORMAL, Direction.OUTGOING)
-				.evaluator(Evaluators.all()).uniqueness(Uniqueness.NODE_GLOBAL)
-				.traverse(startNode).nodes()) {
-			ReadingModel tempReading = new ReadingModel(node);
-			readingModels.add(tempReading);
-		}
+		Node startNode = DatabaseService.getStartNode(tradId, db);
+		if (startNode == null)
+			return Response.status(Status.NOT_FOUND)
+					.entity("Could not find tradition with this id").build();
 
-		return readingModels;
+		try (Transaction tx = db.beginTx()) {
+			readingModels = getAllReadingsFromTraditionBetweenRanks(startNode,
+					startRank, endRank);
+			tx.success();
+		} catch (Exception e) {
+			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
+		}
+		ArrayList<List<ReadingModel>> identicalReadings = new ArrayList<List<ReadingModel>>();
+		identicalReadings = getIdenticalReadingsAsList(readingModels,
+				startRank, endRank);
+
+		Boolean isEmpty = true;
+		for (List<ReadingModel> list : identicalReadings) {
+			if (list.size() > 0)
+				isEmpty = false;
+		}
+		if (isEmpty)
+			return Response.status(Status.NOT_FOUND)
+					.entity("no identical readings were found").build();
+
+		return Response.ok(identicalReadings).build();
 	}
 
+	/**
+	 * Helper method to retrieve all readings from a tradition
+	 * 
+	 * @param startNode
+	 * @param startRank
+	 * @param endRank
+	 * @return list of readings of a tradition
+	 */
 	private ArrayList<ReadingModel> getAllReadingsFromTraditionBetweenRanks(
-			Node startNode, long startRank, long endRank,
-			GraphDatabaseService db) {
+			Node startNode, long startRank, long endRank) {
 
 		ArrayList<ReadingModel> readingModels = new ArrayList<ReadingModel>();
 
@@ -823,65 +980,14 @@ public class Reading implements IResource {
 	}
 
 	/**
-	 * get all reaings which have the same text and the same rank between given
-	 * ranks
-	 * 
-	 * @param tradId
-	 *            the id of the tradition in which to look for identical
-	 *            readings
-	 * @param startRank
-	 *            the rank from where to start the search
-	 * @param endRank
-	 *            the end rank of the search range
-	 * @return a list of lists: each list contain identical readings
-	 */
-	@GET
-	@Path("getidenticalreadings/fromtradition/{tradId}/fromstartrank/{startRank}/toendrank/{endRank}")
-	@Produces(MediaType.APPLICATION_JSON)
-	public Response getIdenticalReadings(@PathParam("tradId") String tradId,
-			@PathParam("startRank") long startRank,
-			@PathParam("endRank") long endRank) {
-
-		ArrayList<ReadingModel> readingModels = new ArrayList<ReadingModel>();
-
-		Node startNode = DatabaseService.getStartNode(tradId, db);
-		if (startNode == null)
-			return Response.status(Status.NOT_FOUND)
-					.entity("Could not find tradition with this id").build();
-
-		try (Transaction tx = db.beginTx()) {
-			readingModels = getAllReadingsFromTraditionBetweenRanks(startNode,
-					startRank, endRank, db);
-			tx.success();
-		} catch (Exception e) {
-			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
-		} finally {
-
-		}
-		ArrayList<List<ReadingModel>> identicalReadings = new ArrayList<List<ReadingModel>>();
-		identicalReadings = getIdenticalReadingsAsList(readingModels,
-				startRank, endRank);
-
-		Boolean isEmpty = true;
-		for (List<ReadingModel> list : identicalReadings) {
-			if (list.size() > 0)
-				isEmpty = false;
-		}
-		if (isEmpty)
-			return Response.status(Status.NOT_FOUND)
-					.entity("no identical readings were found").build();
-
-		return Response.ok(identicalReadings).build();
-	}
-
-	/**
 	 * Returns a list of a list of readingModels with could be one the same rank
 	 * without problems
 	 * 
 	 * @param tradId
 	 * @param startRank
 	 * @param endRank
-	 * @return
+	 * @return list of readings that could be at the same rank in JSON format or
+	 *         an ERROR in JSON format
 	 */
 	@GET
 	@Path("couldbeidenticalreadings/fromtradition/{tradId}/fromstartrank/{startRank}/toendrank/{endRank}")
@@ -899,15 +1005,12 @@ public class Reading implements IResource {
 
 		try (Transaction tx = db.beginTx()) {
 			ArrayList<Node> questionedReadings = getReadingsBetweenRanks(
-					startRank, endRank, db, startNode);
+					startRank, endRank, startNode);
 
-			couldBeIdenticalReadings = getCouldBeIdenticalAsList(
-					questionedReadings, db);
+			couldBeIdenticalReadings = getCouldBeIdenticalAsList(questionedReadings);
 			tx.success();
 		} catch (Exception e) {
 			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
-		} finally {
-
 		}
 		if (couldBeIdenticalReadings.size() == 0)
 			return Response.status(Status.NOT_FOUND)
@@ -917,15 +1020,14 @@ public class Reading implements IResource {
 	}
 
 	/**
-	 * Makes separate List for every group of Readings with identical text and
+	 * Makes separate lists for every group of readings with identical text and
 	 * different ranks and send the list for further test
 	 * 
 	 * @param questionedReadings
-	 * @param db
-	 * @return
+	 * @return list of lists of identical readings
 	 */
 	private ArrayList<ArrayList<ReadingModel>> getCouldBeIdenticalAsList(
-			ArrayList<Node> questionedReadings, GraphDatabaseService db) {
+			ArrayList<Node> questionedReadings) {
 
 		ArrayList<ArrayList<ReadingModel>> couldBeIdenticalReadings = new ArrayList<ArrayList<ReadingModel>>();
 
@@ -942,7 +1044,7 @@ public class Reading implements IResource {
 				}
 			}
 			if (sameText.size() > 0)
-				couldBeIdenticalCheck(sameText, couldBeIdenticalReadings, db);
+				couldBeIdenticalCheck(sameText, couldBeIdenticalReadings);
 		}
 		return couldBeIdenticalReadings;
 	}
@@ -952,11 +1054,9 @@ public class Reading implements IResource {
 	 * 
 	 * @param sameText
 	 * @param couldBeIdenticalReadings
-	 * @param db
 	 */
 	private void couldBeIdenticalCheck(ArrayList<Node> sameText,
-			ArrayList<ArrayList<ReadingModel>> couldBeIdenticalReadings,
-			GraphDatabaseService db) {
+			ArrayList<ArrayList<ReadingModel>> couldBeIdenticalReadings) {
 
 		ArrayList<ReadingModel> couldBeIdentical = new ArrayList<ReadingModel>();
 
@@ -1021,8 +1121,16 @@ public class Reading implements IResource {
 		}
 	}
 
+	/**
+	 * Returns all readings between two ranks of readings
+	 * 
+	 * @param startRank
+	 * @param endRank
+	 * @param startNode
+	 * @return list of readings
+	 */
 	private ArrayList<Node> getReadingsBetweenRanks(long startRank,
-			long endRank, GraphDatabaseService db, Node startNode) {
+			long endRank, Node startNode) {
 		ArrayList<Node> readings = new ArrayList<Node>();
 
 		for (Node node : db.traversalDescription().breadthFirst()
@@ -1031,16 +1139,15 @@ public class Reading implements IResource {
 			if ((Long) node.getProperty("rank") > startRank
 					&& (Long) node.getProperty("rank") < endRank)
 				readings.add(node);
-
 		}
 		return readings;
 	}
 
 	/**
-	 * gets identical readings in a tradition between the given ranks
+	 * Gets identical readings in a tradition between the given ranks
 	 * 
 	 * @param readingModels
-	 *            list of all readings sorted according to rank
+	 *            list of all readings sorted by rank
 	 * @param startRank
 	 * @param endRank
 	 * @return list of the identical readings as readingModels
@@ -1069,9 +1176,9 @@ public class Reading implements IResource {
 	}
 
 	/**
-	 * compress two readings into one. Texts will be concatenate together (with
-	 * or without a space or extra text The reading with the lower rank should
-	 * be given first
+	 * Compress two readings into one. Texts will be concatenated together (with
+	 * or without a space or extra text. The reading with the lower rank will be
+	 * given first. Opposite of split
 	 * 
 	 * @param readId1
 	 *            the id of the first reading
@@ -1080,23 +1187,24 @@ public class Reading implements IResource {
 	 * @param con
 	 *            concatenate must be 0 (for 'no') or 1 (for 'yes'). if
 	 *            concatenate is set to 1, the compressing will be done with
-	 *            conString between the texts of the readings. If it is 0, texts
-	 *            will be concatenate with a single space. If con is 1 and
-	 *            conString is a single space, the texts will be concatenated
-	 *            without a gap
-	 * @param conString
+	 *            with_str between the texts of the readings. If it is 0, texts
+	 *            will be concatenate with a single space.
+	 * @param with_str
 	 *            the string which will come between the texts of the readings
-	 *            if con is set to 1 could also be an empty string
+	 *            if con is set to 1 could also be an empty string. Is given as
+	 *            a String to avoid problems with 'unsafe' characters in the URL
 	 * 
 	 * @return status.ok if compress was successful.
 	 *         Status.INTERNAL_SERVER_ERROR with a detailed message if not
+	 *         concatenated
 	 */
 	@POST
-	@Path("compressreadings/read1id/{read1Id}/read2id/{read2Id}/concatenate/{con}/with_str/{conString}")
+	@Path("compressreadings/read1id/{read1Id}/read2id/{read2Id}/concatenate/{con}")
+	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response compressReadings(@PathParam("read1Id") long readId1,
 			@PathParam("read2Id") long readId2, @PathParam("con") String con,
-			@PathParam("conString") String conString) {
+			CharacterModel character) {
 
 		Node read1, read2;
 		errorMessage = "problem with a reading. could not compress";
@@ -1119,8 +1227,8 @@ public class Reading implements IResource {
 						.status(Status.INTERNAL_SERVER_ERROR)
 						.entity("the first reading has a higher rank then the second reading")
 						.build();
-			if (canCompress(read1, read2, db)) {
-				compress(read1, read2, toConcatenate, conString, db);
+			if (canBeCompressed(read1, read2)) {
+				compress(read1, read2, toConcatenate, character.getCharacter());
 				tx.success();
 				return Response.ok().build();
 			}
@@ -1139,27 +1247,23 @@ public class Reading implements IResource {
 	 *            the first reading
 	 * @param read2
 	 *            the second reading
-	 * @param conString
+	 * @param with_str
 	 *            the string to come between the texts of the readings.
 	 * @param toConcatenate
 	 *            boolean: if true - texts of readings will be concatenated with
-	 *            conString in between if false: texts of readings will be
-	 *            concatenated with one empty space in between. If true and
-	 *            conString is a single space, the texts will be concatenated
-	 *            without a gap
+	 *            with_str in between. if false: texts of readings will be
+	 *            concatenated with one empty space in between.
 	 */
 	private void compress(Node read1, Node read2, boolean toConcatenate,
-			String conString, GraphDatabaseService db) {
+			String with_str) {
 		String textRead1 = (String) read1.getProperty("text");
 		String textRead2 = (String) read2.getProperty("text");
 		if (!toConcatenate)
 			read1.setProperty("text", textRead1 + " " + textRead2);
-		else if (conString.equals(" "))
-			read1.setProperty("text", textRead1 + textRead2);
 		else
-			read1.setProperty("text", textRead1 + conString + textRead2);
+			read1.setProperty("text", textRead1 + with_str + textRead2);
 
-		Relationship from1to2 = getRealtionshipBetweenReadings(read1, read2, db);
+		Relationship from1to2 = getRelationshipBetweenReadings(read1, read2);
 		from1to2.delete();
 		copyRelationships(read1, read2);
 		read2.delete();
@@ -1197,7 +1301,8 @@ public class Reading implements IResource {
 	}
 
 	/**
-	 * checks if two readings could be compressed
+	 * checks if two readings could be compressed. Sets the global error message
+	 * if not.
 	 * 
 	 * @param read1
 	 *            the first reading
@@ -1205,7 +1310,7 @@ public class Reading implements IResource {
 	 *            the second reading
 	 * @return true if ok to compress, false otherwise
 	 */
-	private boolean canCompress(Node read1, Node read2, GraphDatabaseService db) {
+	private boolean canBeCompressed(Node read1, Node read2) {
 		Iterable<Relationship> rel;
 		rel = read2.getRelationships(ERelations.NORMAL);
 
@@ -1214,14 +1319,14 @@ public class Reading implements IResource {
 			errorMessage = "second readings is not connected. could not compress";
 			return false;
 		}
-		Relationship from1to2 = getRealtionshipBetweenReadings(read1, read2, db);
+		Relationship from1to2 = getRelationshipBetweenReadings(read1, read2);
 		if (from1to2 == null) {
 			errorMessage = "reading are not neighbors. could not compress";
 			return false;
 		}
 
-		if (hasNotNormalRealtionships(read1, db)
-				|| hasNotNormalRealtionships(read2, db)) {
+		if (hasNotNormalRelationships(read1)
+				|| hasNotNormalRelationships(read2)) {
 			errorMessage = "reading has other relations. could not compress";
 			return false;
 		}
@@ -1233,11 +1338,9 @@ public class Reading implements IResource {
 	 * 
 	 * @param read
 	 *            the reading
-	 * @param db
-	 *            the data base
 	 * @return true if it has, false otherwise
 	 */
-	private boolean hasNotNormalRealtionships(Node read, GraphDatabaseService db) {
+	private boolean hasNotNormalRelationships(Node read) {
 		String type = "", normal = "";
 
 		for (Relationship rel : read.getRelationships()) {
@@ -1259,8 +1362,7 @@ public class Reading implements IResource {
 	 *            the second reading
 	 * @return the NORMAL relationship
 	 */
-	private Relationship getRealtionshipBetweenReadings(Node read1, Node read2,
-			GraphDatabaseService db) {
+	private Relationship getRelationshipBetweenReadings(Node read1, Node read2) {
 		Relationship from1to2 = null;
 		for (Relationship tempRel : read1.getRelationships()) {
 			if (tempRel.getOtherNode(read1).equals(read2)) {
@@ -1268,11 +1370,5 @@ public class Reading implements IResource {
 			}
 		}
 		return from1to2;
-	}
-
-	private void swapReadings(Node read1, Node read2) {
-		Node tempRead = read1;
-		read1 = read2;
-		read2 = tempRead;
 	}
 }

@@ -1,6 +1,9 @@
 package net.stemmaweb.printer;
 
+//This software requires dot.exe/dot.app/dot to be installed on the system!
+
 // GraphViz.java - a simple API to call dot from Java programs
+
 
 /*$Id$*/
 /*
@@ -32,8 +35,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.InputStreamReader;
-
-import net.stemmaweb.stemmaserver.OSDetector;
 
 /**
  * <dl>
@@ -192,11 +193,11 @@ public class GraphViz
       byte[] img_stream = null;
       
       String TEMP_DIR = TEMP_DIR_L;
-      if (OSDetector.isWin())
+      if (isWin())
     	  TEMP_DIR = TEMP_DIR_W;
       
       String DOT = DOT_L;
-      if (OSDetector.isWin())
+      if (isWin())
     	  DOT = DOT_W;
       
       try {
@@ -241,7 +242,7 @@ public class GraphViz
    {
       File temp;
       String TEMP_DIR = TEMP_DIR_L;
-      if (OSDetector.isWin())
+      if (isWin())
     	  TEMP_DIR = TEMP_DIR_W;
       
       try {
@@ -300,6 +301,12 @@ public class GraphViz
 	   
 	   this.graph = sb;
    }
+   
+   private static boolean isWin()
+	{
+		String OS = System.getProperty("os.name").toLowerCase();
+		return (OS.indexOf("win") >= 0);
+	}
    
 } // end of class GraphViz
 

@@ -29,28 +29,30 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.traversal.Uniqueness;
 
 /**
- * 
- * This class provides a method for importing Graphml (XML) File into Neo4J
+ * This class provides a method for importing GraphMl (XML) File into Neo4J
  * 
  * @author PSE FS 2015 Team2
- * 
  */
 public class GraphMLToNeo4JParser implements IResource
 {
 	GraphDatabaseServiceProvider dbServiceProvider = new GraphDatabaseServiceProvider();
 	GraphDatabaseService db = dbServiceProvider.getDatabase();
+	
 	/**
-	 * Reads xml file and imports it into Neo4J Database 
-	 * @param filename - the graphMl file
-	 * @param userId - the user id who will own the tradition
-	 * @param nameAbbrev - an abbreviation for the tradition (used as prefix in db)
-	 * @return Http Response
+	 * Reads xml file and imports it into Neo4J Database
+	 * 
+	 * @param filename
+	 *            - the graphMl file
+	 * @param userId
+	 *            - the user id who will own the tradition
+	 * @param tradName
+	 *            tradition name that should be used
+	 * @return Http Response with the id of the imported tradition
 	 * @throws FileNotFoundException
 	 * @throws XMLStreamException
 	 */
-	public Response parseGraphML(String filename, String userId) throws FileNotFoundException
+	public Response parseGraphML(String filename, String userId, String tradName) throws FileNotFoundException
 	{
-		
 		XMLInputFactory factory;
 		XMLStreamReader reader;
 		File file = new File(filename);
@@ -71,15 +73,14 @@ public class GraphMLToNeo4JParser implements IResource
     	Node from = null;			// a round-trip store for the start node of a path
     	Node to = null;				// a round-trip store for the end node of a path
     	
-    	LinkedList<String> leximes = new LinkedList<String>();
+    	LinkedList<String> witnesses = new LinkedList<String>();
     								// a round-trip store for witness names of a single relationship
     	int last_inserted_id = 0;
     	
-    	String stemmata = ""; // holds the stemmatas for this graphml
+    	String stemmata = ""; // holds Stemmatas for this GraphMl
     	
     	try (Transaction tx = db.beginTx()) 
     	{
-    		
     		reader = factory.createXMLStreamReader(in);
         	// retrieves the last inserted Tradition id
         	String prefix = db.findNodesByLabelAndProperty(Nodes.ROOT, "name", "Root node")
@@ -144,7 +145,7 @@ public class GraphMLToNeo4JParser implements IResource
 			        					}
 			        					else if(map.get(attr).equals("witness"))
 			        					{
-			        						leximes.add(val);
+			        						witnesses.add(val);
 			        					//rel.setProperty(map.get(reader.getAttributeValue(0)),reader.getElementText());
 			        					}
 			        					else
@@ -186,19 +187,16 @@ public class GraphMLToNeo4JParser implements IResource
 			        		// needs implementation of meta data here
 			        		if(map.get(attr).equals("name"))
 			        		{
-			        			ExecutionResult result = engine.execute("match (n:TRADITION {name:'"+ map.get(attr) +"'}) return n");
-			        			
-			        			Iterator<Node> nodes = result.columnAs("n");
-			        			if(nodes.hasNext())
-			        			{
-			        				throw new Exception("Error: A tradition with the same name already exists");
-			        			}
+			        			String tradNameToUse = text;
+			        			if(!tradName.equals(""))
+			        				tradNameToUse = tradName;
+			        				
 			        			tradRootNode = currNode;
 			        			
 			        			//System.out.println(prefix);
 			        			currNode.setProperty("id", prefix.substring(0, prefix.length()-1));
 			        			
-			        			currNode.setProperty(map.get(attr), text);
+			        			currNode.setProperty("name", tradNameToUse);
 			        		}
 			        		else if(map.get(attr).equals("stemmata"))
 			        		{
@@ -228,12 +226,12 @@ public class GraphMLToNeo4JParser implements IResource
 						        	from = fromTmp;
 						        	if(rel!=null)
 						        	{
-						        		//System.out.println(leximes.toString());
-						        		String[] leximArray = new String[leximes.size()];
-						        		leximArray = leximes.toArray(leximArray);
-						        		if(leximArray.length>0)
-						        			rel.setProperty("lexemes", leximArray);
-						        		leximes.clear();
+						        		//System.out.println(witnesses.toString());
+						        		String[] witnessesArray = new String[witnesses.size()];
+						        		witnessesArray = witnesses.toArray(witnessesArray);
+						        		if(witnessesArray.length>0)
+						        			rel.setProperty("witnesses", witnessesArray);
+						        		witnesses.clear();
 						        	}
 						        	if(graphNumber<=1)
 						        	{
@@ -249,20 +247,22 @@ public class GraphMLToNeo4JParser implements IResource
 			        	}
 			        	else
 			        	{
-			        		Node fromTmp = db.getNodeById(idToNeo4jId.get(fromNodeName));
+			        		Node fromTmp = null;
+			        		if(idToNeo4jId.get(fromNodeName)!=null)
+			        			 fromTmp = db.getNodeById(idToNeo4jId.get(fromNodeName));
 			        		Node toTmp = db.getNodeById(idToNeo4jId.get(toNodeName));
 
-					        if(!(fromTmp.equals(from) && toTmp.equals(to)))
+					        if(fromTmp!=null && !(fromTmp.equals(from) && toTmp.equals(to)))
 					        {
 					        	to = toTmp;
 					        	from = fromTmp;
 					        	if(rel!=null)
 					        	{
-					        		//System.out.println(leximes.toString());
-					        		String[] leximArray = new String[leximes.size()];
-					        		leximArray = leximes.toArray(leximArray);
-					        		rel.setProperty("leximes", leximArray);
-					        		leximes.clear();
+					        		//System.out.println(witnesses.toString());
+					        		String[] witnessesArray = new String[witnesses.size()];
+					        		witnessesArray = witnesses.toArray(witnessesArray);
+					        		rel.setProperty("witnesses", witnessesArray);
+					        		witnesses.clear();
 					        	}
 					        	if(graphNumber<=1)
 					        	{
@@ -331,12 +331,12 @@ public class GraphMLToNeo4JParser implements IResource
 			        }
 			    }
 			}
-			if(rel!=null)	// add relationship props to last rel
+			if(rel!=null)	// add relationship props to last relationship
 			{
-				String[] leximArray = new String[leximes.size()];
-				leximArray = leximes.toArray(leximArray);
-				rel.setProperty("leximes", leximArray);
-				leximes.clear();
+				String[] witnessesArray = new String[witnesses.size()];
+				witnessesArray = witnesses.toArray(witnessesArray);
+				rel.setProperty("witnesses", witnessesArray);
+				witnesses.clear();
 			}
 			
 			ExecutionResult result = engine.execute("match (n:TRADITION {id:'"+ last_inserted_id +"'})-[:NORMAL]->(s:WORD) return s");
@@ -366,15 +366,12 @@ public class GraphMLToNeo4JParser implements IResource
 	   	    ExecutionResult userNodeSearch = engine.execute("match (user:USER {id:'" + userId + "'}) return user");
 	   	    Node userNode = (Node) userNodeSearch.columnAs("user").next();
 	   	    userNode.createRelationshipTo(tradRootNode, ERelations.NORMAL);
-	   	    
-	   	    
+
 	   	    db.findNodesByLabelAndProperty(Nodes.ROOT, "name", "Root node")
 	   	    								.iterator()
 	   	    								.next()
 	   	    								.setProperty("LAST_INSERTED_TRADITION_ID", prefix.substring(0, prefix.length()-1));
-	   		
-	   	    
-	   	    
+
 			tx.success();
 		}
 	    catch(Exception e)
@@ -383,11 +380,6 @@ public class GraphMLToNeo4JParser implements IResource
 	    	
 	    	return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Error: Tradition could not be imported!").build();
 	    }
-    	finally
-    	{
-    		
-    	}
-    	
     	
     	String[] graphs = stemmata.split("\\}");
     	
@@ -395,9 +387,7 @@ public class GraphMLToNeo4JParser implements IResource
    	    {
    	    	DotToNeo4JParser parser = new DotToNeo4JParser(db);
    	    	parser.parseDot(graph, last_inserted_id + "");
-   	    }
-   	    
-   	    
+		}
     	
     	return Response.status(Response.Status.OK).entity("{\"tradId\":" + last_inserted_id + "}").build();
 	}

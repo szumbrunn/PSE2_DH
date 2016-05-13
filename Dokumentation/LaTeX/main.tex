@@ -60,8 +60,8 @@
 {\begin{tikzpicture}[remember picture,overlay]
 \node[anchor=north west,inner sep=0pt] at (0,0) {\includegraphics[width=\paperwidth]{Pictures/background.pdf}}; % Background image
 \draw[anchor=north] (midpoint) node [fill=ocre!30!white,fill opacity=0.6,text opacity=1,inner sep=1cm]{\Huge\centering\bfseries\sffamily\parbox[c][][t]{\paperwidth}{\centering Stemmarest\\[15pt] % Book title
-{\Large Dokumentation des PSE2 Projekt}\\[20pt] % Subtitle
-{\small Jakob Schaerer, Severin Zumbrunn, Ido Gershoni, Joel Niklaus, Ramona Imhof}}}; % Author name
+{\Large Documentation of the PSE2 Project 2015}\\[20pt] % Subtitle
+{\small Ido Gershoni, Ramona Imhof, Joel Niklaus, Jakob Schaerer, Severin Zumbrunn}}}; % Author name
 \end{tikzpicture}};
 \end{tikzpicture}
 \vfill
@@ -77,13 +77,13 @@
 
 \noindent Copyright \copyright\ 2015 Team PSE2\\ % Copyright notice
 
-\noindent \textsc{Published by ...}\\ % Publisher
+%\noindent \textsc{Published by ...}\\ % Publisher
 
-\noindent \textsc{....org}\\ % URL
+\noindent \textsc{https://github.com/tohotforice/PSE2\_DH}\\ % URL
 
-\noindent Licensed under the Creative Commons Attribution-NonCommercial 3.0 Unported License (the ``License''). You may not use this file except in compliance with the License. You may obtain a copy of the License at \url{http://creativecommons.org/licenses/by-nc/3.0}. Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an \textsc{``as is'' basis, without warranties or conditions of any kind}, either express or implied. See the License for the specific language governing permissions and limitations under the License.\\ % License information
+%\noindent Licensed under the Creative Commons Attribution-NonCommercial 3.0 Unported License (the ``License''). You may not use this file except in compliance with the License. You may obtain a copy of the License at \url{http://creativecommons.org/licenses/by-nc/3.0}. Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an \textsc{``as is'' basis, without warranties or conditions of any kind}, either express or implied. See the License for the specific language governing permissions and limitations under the License.\\ % License information
 
-\noindent \textit{First printing, March 2013} % Printing/edition date
+\noindent \textit{First printing, Mai 2015} % Printing/edition date
 
 %----------------------------------------------------------------------------------------
 %	TABLE OF CONTENTS
@@ -113,8 +113,64 @@
 
 \chapter{Introduction}
 
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
+We are a team of 5 students from the University of Bern. In the course of the Practical Software Engineering lecture we have been assigned this digital humanities software development project. The goal of this lecture is to experience the development process of a software while working in a team. \\
+The development process included the collection of the requirements through interviews with the customer, implementing the user-stories using agile programming techniques, constant dialog with the customer to ensure the software fulfills her requirements and finally delivering the project to the costumer so it can be put into use. \\
+Our customers goal is to create a tool to analyze old texts by comparing different versions of them. The prototype of this web tool, Stemmaweb, focused on functionality and not on performance, which led to very slow loading times due to the complexity of the different connections between elements in different texts. We were asked to evaluate and develop a more efficient system which would significantly improve the performance of Stemmaweb, purposely by using a graph database over a standard relational database. \\
+To achieve this we used the graph database Neo4. We programmed the software in the programming language Java and worked with Jersey, a Java RESTful framework. In four iterations during 12 weeks we implemented the user-stories given to us and defined a unique API call for each implemented function. This will allow the customer to easily connect her existing Graphical User Interface to the new software we have created.\\
 
+%----------------------------------------------------------------------------------------
+%	CHAPTER 
+%----------------------------------------------------------------------------------------
+
+\chapterimage{header.png} % Chapter heading image
+
+\chapter{Setup}
+
+\section*{Downloading}
+
+git clone https://github.com/tohotforice/PSE2\_DH.git
+
+\section*{Building}
+
+Stemmarest needs to be built using Maven. This can be done using a java IDE (e.g Eclipse) and a Maven plugin
+
+\section*{Running}
+
+As this application represents a server side only, there is no full GUI included. It is possible though to test it by using the test interface testGui.html which is located at StemmaClient.
+
+\section*{Using the test interface}
+
+\begin{itemize}
+\item Create a user and give it an id (this is necessary as every graph needs to be owned by a user)
+\item Import an GraphML file using the id of the user you have created. The generated id of the tradition will be returned
+\item Use the custom request by typing in the API call you want (all calls are listed in the documentation)
+\end{itemize}
+A word about node id's: when a graph is being imported each node gets from Neo4j a unique id-number. In order to use an id in an API call (e.g. reading-id) it is necessary to explicitly get it from the data base. This can be done by using the getAllReadings method (getallreadings/fromtradition/{traditionId}) or by actually going into the data base \\ \quad \\ More information in the README file on GitHib: \textit{https://github.com/tohotforice/PSE2\_DH}
+
+\chapterimage{header.png} % Chapter heading image
+\chapter{Design-Overview}
+\begin{figure}[h!]
+  \caption{Class-Overview}
+  \centering
+    \includegraphics[scale=0.40]{ProjectOverview.png}
+\end{figure}
+This overview shows the relation between the classes of the StemmaREST service. As StemmaREST is based on the Jersey Framework all the provided resources need to be registered in this framework. This is done in the ApplicationConfig class, like it is specified in the chapter Jersey. All classes which should be registered as a 'resource' need to implement the IResource interface. \\
+All IResources which need access to the database use the GraphDatabaseServiceProvider. The GraphDatabaseServiceProvider contains a static GraphDatabaseServiceObject which can be requested by the IResource and used to acces the database.\\
+Several IResources need the service classes to share common functionality.\\
+The model classes are dataclasses which contain the datamodels. They are also used for the serialisation and deserialisation of xml and JSON strings. For this serialisation the jackson package is used.\\
+The parser classes are used to import graphml and dot files into the database.
+
+\begin{figure}[h!]
+  \caption{Request Sequence}
+  \centering
+    \includegraphics[scale=0.40]{stdRequest.png}
+\end{figure}
+When a client sends a request to the stemmaREST service. Jersey instantiates the requested IResource. GraphDatabaseServiceProvided is instantiated to request the singleton database. All requests require access to the database. The transaction is executed in the manner the request requires and a response is sent to the client. 
+\\ \quad \\
+More information about the database design and the Jersey integration can be found in the chapters Database and Jersey. 
+\\ \quad \\
+A more detailed Class-Overview can be found:
+\url{https://github.com/tohotforice/PSE2_DH/blob/master/Dokumentation/DetailedClassOverview.svg}
 
 %----------------------------------------------------------------------------------------
 %	CHAPTER 2
@@ -124,15 +180,32 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 \chapter{Database (neo4j)}
 
-\section{Structure}
-
+In this project a graph database is used to store the data. This was done as graph databases are much faster when it comes down to look for objects in a list that contain some constraints to other objects. \\ In a relational database one would normally use multiple joins to get the desired result, but by using a graph this task becomes much easier since it is possible to traverse the graph from node to node using either breadth- or depth-first algorithms for a specific relation between nodes. This method makes a search for nodes, representing objects, which are connected to each other, very efficient. \\ \quad \\ Neo4J was chosen(more information can be found at http://neo4j.com/developer/graph-db-vs-rdbms/), which is a graph database capable of very efficiently managing nodes and relationship even in a large scale graph.\\
+Additional information regarding performance could be found in the related chapter of this documentation. \\ \quad \\The stemmaweb database is basically a one big graph, with different labels marking different nodes and relationships. \\ \quad \\Those labels are used in the database:\\ \quad \\
+\begin{tabular}{|l|l|}
+\hline 
+\textbf{Nodes} & \textbf{Relationships} \\ 
+\hline 
+ROOT & RELATIONSHIP \\ 
+\hline 
+STEMMA & STEMMA \\ 
+\hline 
+WITNESS & NORMAL \\ 
+\hline 
+TRADITION &  \\ 
+\hline 
+USER &  \\ 
+\hline 
+WORD &  \\ 
+\hline 
+\end{tabular} \\\\
+Since each label is stored in another file, searching or traversing the graph is highly efficient. \\ \quad \\ The database structure is as follows:
 \begin{center}
-\includegraphics[scale=0.65]{Pictures/db_overview.png} 
-\end{center}
+\includegraphics[scale=.5]{Pictures/database.png} 
+\end{center} 
+Neo4J uses a script language called cypher. Cypher is a declarative graph query language that allows for expressive and efficient querying and updating of the graph store. Cypher queries, though, need to be interpreted and translated into an execution plan. This is the reason why they are not always as fast as the native java traversal API, which has therefore become the common query tool used in the project.
 
-\begin{center}
-\includegraphics[scale=0.65]{Pictures/db_overview2.png} 
-\end{center}
+
 %----------------------------------------------------------------------------------------
 %	CHAPTER 3
 %----------------------------------------------------------------------------------------
@@ -141,24 +214,112 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 \chapter{Jersey}
 
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
+\section*{Introduction}
+Jersey is an open source java framework for developing RESTful Web Services in Java that is built upon JAX-RS and serves as a JAX-RS Reference Implementation. It adds additional features and utilities in order to further simplify development of REST-APIs. Jersey helps support exposing the data in different media types, including JSON, which is very frequently used in this project. 
+
+\section*{Method Declarations}
+An example of the method declaration of duplicateReading in the reading class:
+
+\begin{lstlisting}
+@POST
+@Path("duplicatereading")
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+public Response duplicateReading(DuplicateModel duplicateModel)
+\end{lstlisting}
+
+The @POST annotation states the http method.\\
+The @Path annotation sets the url path.\\
+The method "consumes" (i.e. gets from the client side) data sent by the client, in this case a java object of a "DuplicateModel" which is passed with the call as a JSON object and then gets parsed by the server into a POJO. The method "produces" (returns) a response, which is the method's return value, in this case also in JSON. 
+\\\\
+Another example from the witness class:
+
+\begin{lstlisting}
+@GET
+@Path("gettext/fromtradition/{tradId}/ofwitness/{witnessId}")
+@Produces(MediaType.APPLICATION_JSON)
+public Response getWitnessAsText(@PathParam("tradId") String tradId,		
+	@PathParam("witnessId") String witnessId) {
+\end{lstlisting}
+
+The values in curly braces in the path (tradId and witnessId) are path parameters, which are used in the method. In this example they are given in the URL and not as JSON. In the method declaration they are annotated with @PathParam. 
+
+\section*{IResources}
+In the ApplicationConfig class all the IResources (the objects) are loaded in the following method:
+
+\begin{lstlisting}
+@Override
+public Set<Class<?>> getClasses() {
+	Set<Class<?>> s = new HashSet<Class<?>>();
+	s.add(Witness.class);
+	s.add(User.class);
+	s.add(Tradition.class);
+	s.add(Relation.class);
+	s.add(Stemma.class);
+	s.add(Reading.class);
+	
+	return s;
+}
+\end{lstlisting}
+
+An 'IResource' is a class that provides methods annotated with @GET, @POST, @PUT or @DELETE. All the API calls that can be made using stemmarest are defined in those six classes: Witness, User, Tradition, Relation, Stemma and Reading.
+\\
+
+\begin{lstlisting}
+@Path("/reading")
+public class Reading implements IResource {
+\end{lstlisting}
 
 %----------------------------------------------------------------------------------------
-%	CHAPTER 3
+%	CHAPTER 4
 %----------------------------------------------------------------------------------------
 
 \chapterimage{header.png} % Chapter heading image
 
 \chapter{Performance}
 
-The performance is tested by benchmark tests. Please consult the chapter Benchmark Tests in the part Testing of this documentation for further technical information.
+One of the main goals of this project was to create a RESTful service which is significantly faster then the existing one. To verify the speed of the service some performance tests are done. 
+\\ \quad \\
+The goal of the performance tests is to show that the response time of the service is limited and within a usable range. The performance (benchmark) tests therefore measure the time needed to execute all operations for a certain request. This includes the time to transmit the data over HTTP, the time to execute the internal algorithms and the time to access the database. All the Data is transmitted over the local loop interface. The network speed is therefore not measured. 
+\\ \quad \\
+For the purpose of the tests the database is being populated by a random graph which contains several valid traditions on which the REST requests can be executed. Several tests with databases of different sizes are done to show that the response time does not change as the size of the database increases.
+\\ \quad \\
+The first set of diagrams show the result of tests with different database sizes. Those tests show that the RESTful service response time is not influenced by the size of the database in a significant way. This is related to the use of the Graphdatabase in which a query can search a subgraph without filtering the whole database. 
+\begin{remark}
+The implementation of stemmarest uses some search-node-by-id methods (a part of Neo4j framework) which search over the complete database. It is important to realize that those quarries are done in $O(log n)$ time and are not seen in the noise of the other operations during the tests. This can be seen in the diagrams in such methods as \textit{getReading}, \textit{getNextReading} etc, which use the search-node-by-id method and their execution time hardly change even in a very big data base. In a much larger Database those methods will slow down the REST requests, though it is not expected that the database will grow so big that such operations will have any impact.
+\end{remark} 
 
 \begin{figure}[h!]
-  \caption{An example to show what will come here.}
+  \caption{Database with 1000 nodes,  working tradition with 100 nodes }
   \centering
-    \includegraphics[scale=0.6]{firstBenchmark.png}
+    \includegraphics[scale=0.45]{1knode.png}
 \end{figure}
 
+\begin{figure}[h!]
+  \caption{Database with 100000 nodes,  working tradition with 100 nodes }
+  \centering
+    \includegraphics[scale=0.45]{100knode.png}
+\end{figure}
+
+\begin{figure}[h!]
+  \caption{Database with 1000000 nodes,  working tradition with 100 nodes }
+  \centering
+    \includegraphics[scale=0.45]{1000knode.png}
+\end{figure}
+In those diagrams it is possible to see that the response time is almost independent to the database size between 1000 and 1 Million Nodes (Readings). As explained before, this is the result of the fact that each Tradition can be selected as a subgraph and the algorithms only have to search it, rather than the whole database. It is obvious, though, that the tradition size have an influence on the speed of the implemented algorithms as the working subset, which is in most cases a tradition, grows with a bigger tradition. Most of the algorithms which work on a tradition are in $O(log n)$, though there are also some export and import functions which have to handle each node and relation of the tradition and run in $O(n)$. 
+\\ \quad \\
+The following diagrams show the results of the tests in which the dimension of the tradition is varied while the size of the database stays the same. 
+\begin{figure}[h!]
+  \caption{Database with 10000 nodes,  working tradition with 1000 nodes }
+  \centering
+    \includegraphics[scale=0.45]{trad1kwords.png}
+\end{figure}
+\begin{figure}[h!]
+  \caption{Database with 10000 nodes,  working tradition with 10000 nodes }
+  \centering
+    \includegraphics[scale=0.45]{trad10kwords.png}
+\end{figure}
+According to the diagrams, the execution time depends on the size of the working tradition, as can be seen in the results for the getAllReadingsFromATradition method, in which each reading of the tradition is parsed to a JSON Object and all are returned as an List. The parsing of those nodes executes in O(n) time and the downloading of the JSON file takes about the same. As larger traditions are not expected the execution time of those methods stays in the accepted range.
 
 %----------------------------------------------------------------------------------------
 %	PART
@@ -167,21 +328,13 @@ The performance is tested by benchmark tests. Please consult the chapter Benchma
 \part{Testing}
 
 %----------------------------------------------------------------------------------------
-%	CHAPTER 1
+%	CHAPTER 5
 %----------------------------------------------------------------------------------------
 
 \chapterimage{header.png} % Chapter heading image
 
 \chapter{Concept}
-This chapter describes the test-concept of the Digital Humanities PSE2 Project. The testing is used to assure the quality of the project and for test driven development. All tests are written in a manner they don't have any impact on the architecture of the project. To achieve this object mocking and injection by mockito is used. 
-
-\section*{Integration Tests}
-Every user story is tested by an integration Test. The integration tests assures the quality of the project. The technique of integration tests is described in the Integration test chapter. 
-
-\section*{Unit Tests}
-Unit tests are used for test driven development and are defined by the developer. They are only for the development process and are not referenced in quality audits.
-
-\newpage
+This chapter describes the test-concept of the Project. The tests were used for test driven development and to assure the quality of the product. All tests are written in such a manner that they do not have any impact on the architecture of the project.
 
 \section*{Jersey Overview} 
 
@@ -189,69 +342,36 @@ Unit tests are used for test driven development and are defined by the developer
 \includegraphics[scale=.40]{Pictures/jerseyoverview.png} 
 \end{center}
 
-In the productive system for every REST call jersey is instantiating the requested resource and providing the service. Each resource object has its own database service, which is closed after each call. In production a embedded neo4j GraphDatabase is used. To achieve a minimal invasive test system the productive database needs to be replaced with a test database. To change the database without test related code in the project, object injection is used. 
+For every REST call in the system a jersey instantiate the requested IResource and provides the service. A global singleton GraphDatabaseService object, which is is an embedded neo4j GraphDatabase, is used to provide the service. To achieve a minimal invasive test system the actual database is being replaced with a test database. To change the database with minimal test related code in the project, the GraphDatabaseServiceProvider is configured to return an impermanent Database. As the GraphDatabaseService is a singleton object this configuration is done before the start-up of the Jersey Testserver.
 
+%----------------------------------------------------------------------------------------
+%	CHAPTER 6
+%----------------------------------------------------------------------------------------
 
-\chapter{Injection}
-Mockito is used to mock, spy and inject objects in the tests. To use Mockito with junit the following annotation has to be done directly above the class header.
-\begin{lstlisting}[language=java]
-@RunWith(MockitoJUnitRunner.class)
-\end{lstlisting}
-With the MockitoJUnitRunner the annotations @Mock, @Spy and @InjectMocks can be used. To inject an GraphDatabaseService, the GraphDatabaseFactory is mocked and the newEmbeddedDatabase method overwritten that it returns an impermanent database. 
-\begin{lstlisting}[language=java]
-@Mock
-protected GraphDatabaseFactory mockDbFactory =
-   new GraphDatabaseFactory();
-\end{lstlisting}
-The Mock annotation creates a Mock object. This is needed to overwrite the newEmbeddedDatabase method.
-\begin{lstlisting}[language=java]
-Mockito.when(mockDbFactory.newEmbeddedDatabase(Matchers.anyString()))
-	.thenReturn(mockDbService);  
-\end{lstlisting}
-Where mockDbService is a spy object. This is needed to suppress each shutdown call of this object. This is necessary because the resource is not new created for every restcall and so the database should not be closed. See more in the Integrationtest chapter. 
-\begin{lstlisting}[language=java]
-@Spy
-protected GraphDatabaseService mockDbService = 
-  new TestGraphDatabaseFactory().newImpermanentDatabase();
-\end{lstlisting}
+\chapter{Configure the Test-Database}
+
+To use an impermanent Testdatabase in the Tests the following initialization steps are done:
+A Claswide GraphDatabaseService object db is registered:
 
 \begin{lstlisting}[language=java]
-Mockito.doNothing().when(mockDbService).shutdown();
+    GraphDatabaseService db;
 \end{lstlisting}
-
-And the injection of the Mockobjects into a resource
+In the @Before method the singleton GraphDatabaseService provided by the GraphDatabaseServiceProvider is overwritten by the following line:
 
 \begin{lstlisting}[language=java]
-@InjectMocks
-private User userResource;
+    GraphDatabaseServiceProvider.setImpermanentDatabase();
+\end{lstlisting}
+Later the db object is initialized by:
+\begin{lstlisting}[language=java]
+    db = new GraphDatabaseServiceProvider().getDatabase();
+\end{lstlisting}
+In the @After method the database is being closed:
+\begin{lstlisting}[language=java]
+    db.shutdown();
 \end{lstlisting}
 
 %----------------------------------------------------------------------------------------
-%	CHAPTER 2
-%----------------------------------------------------------------------------------------
-
-\chapterimage{header.png} % Chapter heading image
-
-\chapter{Unit Test}
-
-\begin{center}
-\includegraphics[scale=.4]{Pictures/junitoverview.png}
-\end{center} 
- 
-For Unit Tests the methods of the resource are called directly.
-\begin{lstlisting}[language=java]
-@Test
-public void SimpleTest(){
-  String actualResponse = userResource.getIt();
-  assertEquals(actualResponse, "User!");
-}
-\end{lstlisting}
-
-
-\subsection*{Example}
-\url{https://github.com/tohotforice/PSE2_DH/blob/e364fcb0c164981281c5799a6bf9f9f9ea5eb503/stemmarest/src/test/java/net/stemmaweb/stemmaserver/UserUnitTest.java}
-%----------------------------------------------------------------------------------------
-%	CHAPTER 3
+%	CHAPTER 7
 %----------------------------------------------------------------------------------------
 
 \chapterimage{header.png} % Chapter heading image
@@ -262,19 +382,20 @@ public void SimpleTest(){
 \includegraphics[scale=.4]{Pictures/jerseytestoverview.png} 
 \end{center}
 
-To inject objects into a resource it is mandatory that the resource is created statically at the place the injection is done. This is not possible when the resources are instantiated when a REST call occurs. To solve this JerseyTestServerFactory creates a server where already instantiated resources can be registered. 
-To start a JerseyTestServer a global JerseyTest has to be created.
+Every user story is tested with integration tests. Those tests are the mean of assuring the quality of the project. \\ \quad \\ To inject objects into a resource the resource must be created statically. This is not possible when the resources are instantiated only when a REST call occurs. To solve this problem JerseyTestServerFactory creates a server where instantiated resources can be registered.\\
+To start a JerseyTestServer a global JerseyTest is created:
 \begin{lstlisting}[language=java]
 private JerseyTest jerseyTest;
 \end{lstlisting}
-The JerseyTestServerFactory creates a JerseyTest with already instantiated resources. This is necessary to inject the mock objects. Multiple resources can be added by chaining .addResource(..).addResource()
+The JerseyTestServerFactory creates a JerseyTest with already instantiated resources. This is used to inject the mock objects.\\
+ Multiple resources can be added by chaining: .addResource(..).addResource()
 \begin{lstlisting}[language=java]
 jerseyTest = JerseyTestServerFactory.newJerseyTestServer()
 	.addResource(userResource).create();
 jerseyTest.setUp();
 \end{lstlisting}
 
-The test is done by calling a webresource of jerseyTest
+The test is done by calling a webresource of jerseyTest:
 \begin{lstlisting}[language=java]
 @Test
 public void SimpleTest(){
@@ -288,38 +409,38 @@ public void SimpleTest(){
 \url{https://github.com/tohotforice/PSE2_DH/blob/e364fcb0c164981281c5799a6bf9f9f9ea5eb503/stemmarest/src/test/java/net/stemmaweb/stemmaserver/UserTest.java}
 
 %----------------------------------------------------------------------------------------
-%	CHAPTER 4
+%	CHAPTER 8
 %----------------------------------------------------------------------------------------
 
 \chapterimage{header.png} % Chapter heading image
 
 \chapter{Benchmark Testing}
 
-A main goal of the PSE2 stemmarest project is a good performance compared to the previous RESTful service. To measure the performance benchmark testing is needed. A benchmark test basically calls the RESTful service multiple times and measure the response time. To achieve this \textit{com.carrotsearch.junitbenchmarks} a handy JUnit benchmark test suite is used. This JUnitbenchmarks measure the time which is used to execute a test and can generate visual representations of the measurement.\\
-For the benchmark testing it is of interest to have a variety of different databases. Those databases should differ in their size from small to very huge. This allows to measure the algorithms in extreme situations.
-To generate valid graphs only limited by diskspace the class \textit{RandomGraphGenerator} can be used. By calling the static method role a graph is generated according to the parameters.\\
+The main goal of the stemmarest project was to achieve better performance then the previous service. To measure the performance of the system benchmark testing was needed. A benchmark test basically calls the RESTful service multiple times and measure the response time. To achieve this a JUnit benchmark test suite is used. The JUnitbenchmarks measures the time used to execute a test and can generate visual representations of the measurement.\\
+For effective benchmark testing it is important to have a variety of different databases. Those databases should differ in size from small to very large.
+To generate valid graphs only limited by space the class \textit{RandomGraphGenerator} is being used. By calling this static method a graph is generated according to the given parameters.\\
 \begin{remark}
-Please note that the response time highly depends on the hardware the tests are running on and the actual state of Javas virtual machine. 
+Please note that the response time depends highly on the hardware the tests are running on and the actual state of Javas virtual machine. 
 \end{remark}
-To reduce the influence of the virtual machine before the measurements 5 warm-up calls are done to bring the virtual machine to live. The hardware which was used for testing is represented in the report.
+To reduce the influence of the virtual machine before the measurements 5 warm-up calls are done. The hardware which was used for testing is represented in the report.
 
 \section*{Setup}
-All the classes related to the Benchmark Tests can be found in the package \\ \textit{net.stemmaweb.stemmaserver.benachmarktests}. The class BenchmarkTests contains all Tests. The classes Benchmark<n>Nodes contain the database generation. Here is configured how many nodes the database has. This are also the classes which are run with JUnit test. BenchmarkTests cant be run as a JUnit test as it is a abstract class. s
+All the classes related to the Benchmark Tests can be found in the package \\ \textit{net.stemmaweb.stemmaserver.benachmarktests}. The class BenchmarkTests contains all the Tests. The classes Benchmark<n>Nodes contain the database generator. In it the number of nodes in the current test-database is being configured. BenchmarkTests cant be run as a JUnit test.
 
 \begin{center}
 \includegraphics[scale=0.4]{BenchmarkTestsClassOverview.jpg} 
 \end{center}
 
-Tests are simply implemented in the BenchmarkTests class with the @Test annotation. It is best practice only to implement the restcall in this method and only test if Response.Status is OK. This assures that as less as possible overhead time is measured. And the integration- and JUnit tests should be done on a other place.
+Tests are implemented in the BenchmarkTests class with the @Test annotation. Only restcall is implemented in the methods and they only test if the Response.Status is OK. This assures that as low as possible overhead time will be generated and measured.
 
 \begin{remark}
 JUnitBenchmarks measures the time to execute (@Before, @Test, @After). Heavy operations which should not be measured can be done in @BeforeClass and @AfterClass.
 \end{remark}
 
-To create a new database test-environment copy the class Benchmark600Nodes and rename it to the count of Nodes that should be inserted. In the class itself only two small adjustments need to be done. First change the name of the report file \textit{@BenchmarkMethodChart(filePrefix = ''benchmark/benchmark-600Nodes'')}. Second adjust the properties of the database which should be generated \textit{rgg.role(db, 2, 1, 3, 100);}. role(databaseService, cardinalityOfUsers, cardinalityOfTraditionsPerUser, cardinalityOfWitnessesPerTradition, degreeOfTheTraditionGraphs)
+To create a new database, the test-environment copies the class Benchmark600Nodes and rename it to the count of Nodes that are being inserted. In the class itself only two small adjustments are done: the name of the report file is being changed \textit{@BenchmarkMethodChart(filePrefix = ''benchmark/benchmark-600Nodes'')} and the properties of the database which should be generated are being adjusted \textit{rgg.role(db, 2, 1, 3, 100);}. role(databaseService, cardinalityOfUsers, cardinalityOfTraditionsPerUser, cardinalityOfWitnessesPerTradition, degreeOfTheTraditionGraphs)
 
 \section*{Run Benchmarktests}
-The Benchmarktests can be run as every JUnit test. But to generate the report an argument needs to be passed by. 
+The Benchmarktests can be run as every JUnit test. To generate the report, though, an argument needs to be passed. 
 Create a JUnit Test as follows:
 
 \begin{center}
@@ -330,10 +451,10 @@ Create a JUnit Test as follows:
 \includegraphics[scale=0.4]{benchmarkTestArgument.png} 
 \end{center}
 
-On the tab Arguments \textit{-Djub.consumers=CONSOLE,H2 -Djub.db.file=.benchmarks} has to be inserted into the VM Arguments input. After the test can be run as usual. After the test execution the reports are stored under \textit{benchmark/}.
+On the tab Arguments \textit{-Djub.consumers=CONSOLE,H2 -Djub.db.file=.benchmarks} has to be inserted into the VM Arguments input. After that the test can be executed as usual. After the execution of the tests the reports will be stored at \textit{benchmark/}.
  
 \begin{remark}
-The execution of the tests will take some time because of the generation of huge graphs. Its recommended not to use the computer during this tests.  
+The execution of the tests will take some time because of the need to generate huge graphs. Its recommended not to use the computer for other assignments during the tests.  
 \end{remark}
 
 
@@ -343,276 +464,30 @@ The execution of the tests will take some time because of the generation of huge
 
 \part{RESTful API}
 
-%----------------------------------------------------------------------------------------
-%	CHAPTER 1
-%----------------------------------------------------------------------------------------
-
-\chapterimage{header.png} % Chapter heading image
-
-\chapter{Documentation}
-
-\section{/user}
-\begin{get}
-/user
-\end{get}
-
-\subsection*{Summary}
-Returns a welcome message
-\begin{parameter}
-\end{parameter}
-\begin{return}[SUCCESS]
-\textbf{text/plain}\\
-''User!''
-\end{return}
-
-\section{/user/create}
-\begin{post}
-/user/create
-\end{post}
-
-\subsection*{Summary}
-Creates a user.
-\begin{parameter}
-\textbf{application/json}\\
-\{ ''userId'':<userId>, ''isPublic'':<isAdmin> \}
-\end{parameter}
-\begin{return}[CREATED]
-\textbf{application/json}\\
-\{ ''userId'':<userId>, ''isPublic'':<isAdmin> \}
-\end{return}
-\begin{return}[CONFLICT]
-\textbf{application/json}\\
-Error: A user with this id already exists
-\end{return}
-
-\section{/user/\{id\}}
-\begin{get}
-/user/\{id\}
-\end{get}
-
-\subsection*{Summary}
-Returns the user as JSON Object
-\begin{parameter}\textbf{URL}\\
- Id: the user id
-\end{parameter}
-\begin{return}[OK]
-\textbf{application/json}\\
-\{ 'userId': <userId>, 'isAdmin': <isAdmin> \}\\
-\textit{The information about the user}
-\end{return}
-\begin{return}[NOT\_FOUND]
-\textbf{application/json}\\
-\textit{The information about the user}
-\end{return}
-
-\section{/user/traditions/\{userId\}}
-\begin{get}
-/user/traditions/\{userId\}
-\end{get}
-
-\subsection*{Summary}
-List all Traditions of a user
-\begin{parameter}\textbf{URL}\\
-userId: the id of the user \\
-\end{parameter}
-\begin{return}[OK]
-\textbf{application/json}\\
-\{''traditions'':[ \{''name'':<traditionName> \} ] \}
-\end{return}
-\begin{return}[NOT\_FOUND]
-\textbf{application/json}\\
-Error: A user with this id does not exist!
-\end{return}
-
-\section{/textinfo/\{textId\}}
-\begin{post}
-/textinfo/\{textId\}
-\end{post}
-
-\subsection*{Summary}
-Update the textInfo of a tradition.
-\begin{parameter}\textbf{URL}\\
-textId: the id of the tradition \\
-\end{parameter}
-\begin{parameter}
-\textbf{application/json}\\
-\{  'name': <new\_name>, 'language': <new\_language>, 'isPublic': <is\_public>, 'ownerId': <new\_ownerId>  \}
-\end{parameter}
-\begin{return}[SUCCESS]
-\textbf{application/json}\\
-\{  'name': <new\_name>, 'language': <new\_language>, 'isPublic': <is\_public>, 'ownerId': <new\_ownerId>  \}\\
-\textit{The new information of the tradition.}
-\end{return}
-\begin{return}[CONFLICT]
-\textbf{application/json}\\
-''Error: A user with this id does not exist''\\
-\textit{If the user does not exist. }
-\end{return}
-\begin{return}[NOT\_FOUND]
-\textbf{application/json}\\
-\textit{If the tradition was not found. }
-\end{return}
-
-\section{/tradition/witness/\{tradId\}}
-\begin{get}
-/tradition/witness/\{tradId\}
-\end{get}
-
-\subsection*{Summary}
-List all Witness of a tradition
-\begin{parameter}\textbf{URL}\\
-tradId: the id of the tradition \\
-\end{parameter}
-\begin{return}[OK]
-\textbf{application/json}\\
-
-\end{return}
-\begin{return}[NOT\_FOUND]
-\textbf{application/json}\\
-Error: A tradition with this id does not exist!
-\end{return}
-
-\section{/tradition/relation/\{tradId\}/relationships}
-\begin{get}
-/tradition/relation/\{tradId/relationships\}
-\end{get}
-
-\subsection*{Summary}
-List all Relationships of a tradition
-\begin{parameter}\textbf{URL}\\
-tradId: the id of the tradition \\
-\end{parameter}
-\begin{return}[OK]
-\textbf{application/json}\\
-\end{return}
-
-\section{/tradition/new}
-\begin{post}
-/tradition/new
-\end{post}
-
-\subsection*{Summary}
-Create a new tradition.
-\begin{parameter}
-\textbf{text/plain}\\
-name: The name of the tradition
-\end{parameter}
-\begin{parameter}
-\textbf{multipart/form-data}\\
-language: The language of the tradition\\
-public: 0 if the tradition is not public 1 if the tradition is public\\
-name: The name of the tradition\\
-file: multipart file input stream
-\end{parameter}
-\begin{return}[CONFLICT]
-\textbf{application/json}\\
-''Error: No user with this id exists''
-\end{return}
-\begin{return}[INTERNAL\_SERVER\_ERROR]
-\textbf{application/json}\\
-''Error: Tradition could not be imported!''
-\textit{If the server was not able to parse the input file}
-\end{return}
-\begin{return}[OK]
-\textbf{application/json}\\
-''Tradition imported successfully''
-\end{return}
-
-\section{/tradition/get/\{tradId\}}
-\begin{get}
-/tradition/get/\{tradId\}
-\end{get}
-
-\subsection*{Summary}
-Get a graphml of a tradition
-\begin{parameter}\textbf{URL}\\
-tradId: the id of the tradition \\
-\end{parameter}
-\begin{return}[OK]
-\textbf{application/xml}\\
-
-\end{return}
-\begin{return}[NOT\_FOUND]
-\textbf{application/json}\\
-Error: A tradition with this id does not exist!
-\end{return}
-
-\section{/tradition/reading/\{tradId\}/\{readId\}}
-\begin{get}
-/tradition/reading/\{tradId\}/\{readId\}
-\end{get}
-
-\subsection*{Summary}
-Get a specific reading of a tradition
-\begin{parameter}\textbf{URL}\\
-tradId: the id of the tradition \\
-\end{parameter}
-\begin{parameter}\textbf{URL}\\
-readId: the id of the reading \\
-\end{parameter}
-\begin{return}[OK]
-\textbf{application/json} The reading in json\\
-\end{return}
-\begin{return}[NOT\_FOUND]
-\textbf{application/json}\\
-Error: A tradition with this id does not exist!
-\end{return}
-\begin{return}[NOT\_FOUND]
-\textbf{application/json}\\
-Error: A reading with this id does not exist!
-\end{return}
-
-\section{/tradition/duplicate/\{tradId\}}
-\begin{post}
-/tradition/duplicate/\{tradId\}
-\end{post}
-
-\subsection*{Summary}
-Duplicates readings in a tradition. Is the opposite method of merge.
-\begin{parameter}\textbf{URL}\\
-tradId: the id of the tradition \\
-\end{parameter}
-\begin{parameter}
-\textbf{application/json}\\
-\{  'readings': [readId1, readId2], 'witnesses': ["wit1", "wit2"]\}
-\end{parameter}
-\begin{return}[OK]
-\textbf{application/json}\\
-\textit{Successfully duplicated readings}
-\end{return}
-\begin{return}[NOT\_FOUND]
-\textbf{application/json}\\
-\textit{If the tradition was not found. }
-\end{return}
-\begin{return}[NOT\_FOUND]
-\textbf{application/json}\\
-\textit{If one of the readings was not found. }
-\end{return}
-
 \include{api_generated}
 
 %----------------------------------------------------------------------------------------
 %	BIBLIOGRAPHY
 %----------------------------------------------------------------------------------------
 
-\chapter*{Bibliography}
-\addcontentsline{toc}{chapter}{\textcolor{ocre}{Bibliography}}
-\section*{Books}
-\addcontentsline{toc}{section}{Books}
-\printbibliography[heading=bibempty,type=book]
-\section*{Articles}
-\addcontentsline{toc}{section}{Articles}
-\printbibliography[heading=bibempty,type=article]
+%\chapter*{Bibliography}
+%\addcontentsline{toc}{chapter}{\textcolor{ocre}{Bibliography}}
+%\section*{Books}
+%\addcontentsline{toc}{section}{Books}
+%\printbibliography[heading=bibempty,type=book]
+%\section*{Articles}
+%\addcontentsline{toc}{section}{Articles}
+%\printbibliography[heading=bibempty,type=article]
 
 %----------------------------------------------------------------------------------------
 %	INDEX
 %----------------------------------------------------------------------------------------
 
-\cleardoublepage
-\phantomsection
-\setlength{\columnsep}{0.75cm}
-\addcontentsline{toc}{chapter}{\textcolor{ocre}{Index}}
-\printindex
+%\cleardoublepage
+%\phantomsection
+%\setlength{\columnsep}{0.75cm}
+%\addcontentsline{toc}{chapter}{\textcolor{ocre}{Index}}
+%\printindex
 
 %----------------------------------------------------------------------------------------
 

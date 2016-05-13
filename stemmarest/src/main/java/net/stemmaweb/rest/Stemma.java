@@ -28,11 +28,9 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.traversal.Uniqueness;
 
 /**
- * 
  * Comprises all the api calls related to a stemma.
- * 
+ * Can be called using http://BASE_URL/stemma
  * @author PSE FS 2015 Team2
- *
  */
 @Path("/stemma")
 public class Stemma implements IResource {
@@ -41,10 +39,11 @@ public class Stemma implements IResource {
 	GraphDatabaseService db = dbServiceProvider.getDatabase();
 	
 	/**
-	 * Gets a list of all stemmata available, as dot format
+	 * Gets a list of all Stemmata available, as dot format
 	 * 
 	 * @param tradId
-	 * @return list of dot
+	 * @return Http Response ok and a list of DOT JSON strings on success or an
+	 *         ERROR in JSON format
 	 */
 	@GET
 	@Path("getallstemmata/fromtradition/{tradId}")
@@ -90,17 +89,17 @@ public class Stemma implements IResource {
 	}
 	
 	/**
-	 * Returns JSON string with a stemma of a tradition in DOT format
+	 * Returns JSON string with a Stemma of a tradition in DOT format
 	 * 
 	 * @param tratitionId
 	 * @param stemmaTitle
-	 * @return DOT JSON string
+	 * @return Http Response ok and DOT JSON string on success or an ERROR in
+	 *         JSON format
 	 */
 	@GET
 	@Path("getstemma/fromtradition/{tradId}/withtitle/{stemmaTitle}")
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response getStemma(@PathParam("tradId") String tradId,@PathParam("stemmaTitle") String stemmaTitle) {
-		
 		
 		Neo4JToDotParser parser = new Neo4JToDotParser(db);
 		Response resp = parser.parseNeo4JStemma(tradId, stemmaTitle);
@@ -109,17 +108,16 @@ public class Stemma implements IResource {
 	}
 
 	/**
-	 * Puts the stemma of a DOT file in the database
+	 * Puts the Stemma of a DOT file in the database
 	 * 
 	 * @param tratitionId
-	 * @return 
+	 * @return Http Response ok and DOT JSON string on success or an ERROR in
+	 *         JSON format
 	 */
 	@POST
 	@Path("newstemma/intradition/{tradId}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	public Response setStemma(@PathParam("tradId") String tradId, String dot) {
-		
-		
 		DotToNeo4JParser parser = new DotToNeo4JParser(db);
 		Response resp = parser.parseDot(dot,tradId);
 		
@@ -127,17 +125,19 @@ public class Stemma implements IResource {
 	}
 	
 	/**
-	 * Reorients the stemma tree with a given new root node
+	 * Reorients a stemma tree with a given new root node
 	 * 
-	 * @param tratitionId
-	 * @return 
+	 * @param tradId
+	 * @param stemmaTitle
+	 * @param nodeId
+	 * @return Http Response ok and DOT JSON string on success or an ERROR in
+	 *         JSON format
 	 */
 	@POST
 	@Path("reorientstemma/fromtradition/{tradId}/withtitle/{stemmaTitle}/withnewrootnode/{nodeId}")
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response reorientStemma(@PathParam("tradId") String tradId,@PathParam("stemmaTitle") String stemmaTitle,
 			@PathParam("nodeId") String nodeId) {
-		
 		
 		ExecutionEngine engine = new ExecutionEngine(db);
 		
@@ -169,31 +169,27 @@ public class Stemma implements IResource {
 			Node newRootNode = nodes.next();
     		
     		if(stemmaType.equals("digraph"))
-	    		resp = reorientDigraph(db,newRootNode,startNodeStemma);
+				resp = reorientDigraph(newRootNode, startNodeStemma);
     		else
     			resp = reorientGraph(newRootNode,startNodeStemma);
 		
 		
 		tx.success();
 		}
-		finally
-    	{
-    		
-    	}
+		resp = getStemma(tradId, stemmaTitle);
 		return resp;
     	
 	}
 
 	/**
-	 * Reorients a digraph: Searches the path to the new rootnode; reverse the
-	 * realtionships; change the first relationship
+	 * Reorients a directed Graph: Searches the path to the new RootNode; reverse the
+	 * relationships; changes the first relationship
 	 * 
-	 * @param db
 	 * @param newRootNode
 	 * @param startNodeStemma
 	 * @return
 	 */
-	private Response reorientDigraph(GraphDatabaseService db, Node newRootNode, Node startNodeStemma) {
+	private Response reorientDigraph(Node newRootNode, Node startNodeStemma) {
 		
 		Iterator<Relationship> stRels = startNodeStemma.getRelationships().iterator();
 		
@@ -233,13 +229,12 @@ public class Stemma implements IResource {
 		
 		reorientGraph(newRootNode, startNodeStemma);
 			
-
 		return Response.ok().build();
 		
 	}
 	
 	/**
-	 * Reorients a graph: deletes first relationship to node and exchange with a relationship to 
+	 * Reorients an undirected graph: deletes first relationship to node and exchange with a relationship to 
 	 * the new root node
 	 * 
 	 * @param newRootNode

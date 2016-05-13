@@ -21,14 +21,11 @@ import net.stemmaweb.stemmaserver.OSDetector;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.runners.MockitoJUnitRunner;
 import org.neo4j.cypher.javacompat.ExecutionEngine;
 import org.neo4j.cypher.javacompat.ExecutionResult;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.ResourceIterable;
-import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.graphdb.Transaction;
 
 import com.sun.jersey.api.client.ClientResponse;
@@ -42,7 +39,6 @@ import com.sun.jersey.test.framework.JerseyTest;
  * @author PSE FS 2015 Team2
  *
  */
-@RunWith(MockitoJUnitRunner.class)
 public class WitnessTest {
 	private String tradId;
 
@@ -105,7 +101,7 @@ public class WitnessTest {
 		 * load a tradition to the test DB
 		 */
 		try {
-			importResource.parseGraphML(filename, "1");
+			importResource.parseGraphML(filename, "1", "Tradition");
 		} catch (FileNotFoundException f) {
 			// this error should not occur
 			assertTrue(false);
@@ -263,12 +259,13 @@ public class WitnessTest {
 	 */
 	@Test
 	public void traditionEndNodeExistsTest() {
-		ExecutionEngine engine = new ExecutionEngine(db);
-
-		ExecutionResult result = engine
-				.execute("match (e)-[:NORMAL]->(n:WORD) where n.text='#END#' return n");
-		ResourceIterator<Node> tradNodes = result.columnAs("n");
-		assertTrue(tradNodes.hasNext());
+		try (Transaction tx = db.beginTx()) {
+			ResourceIterable<Node> tradNodes = db.findNodesByLabelAndProperty(
+					Nodes.WORD, "text", "#END#");
+			Iterator<Node> tradNodesIt = tradNodes.iterator();
+			assertTrue(tradNodesIt.hasNext());
+			tx.success();
+		}
 	}
 
 	/**

@@ -12,7 +12,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import net.stemmaweb.model.RelationshipModel;
-import net.stemmaweb.model.TraditionMetadataModel;
 import net.stemmaweb.model.TraditionModel;
 import net.stemmaweb.model.WitnessModel;
 import net.stemmaweb.rest.ERelations;
@@ -27,8 +26,6 @@ import net.stemmaweb.stemmaserver.OSDetector;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.runners.MockitoJUnitRunner;
 import org.neo4j.cypher.javacompat.ExecutionEngine;
 import org.neo4j.cypher.javacompat.ExecutionResult;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -46,7 +43,6 @@ import com.sun.jersey.test.framework.JerseyTest;
  * @author PSE FS 2015 Team2
  *
  */
-@RunWith(MockitoJUnitRunner.class)
 public class TraditionTest {
 	private String tradId;
 	
@@ -105,7 +101,7 @@ public class TraditionTest {
 		 * load a tradition to the test DB
 		 */
 		try {
-			importResource.parseGraphML(filename, "1");
+			importResource.parseGraphML(filename, "1", "Tradition");
 		} catch (FileNotFoundException f) {
 			// this error should not occur
 			assertTrue(false);
@@ -140,7 +136,7 @@ public class TraditionTest {
 			filename = "src/TestXMLFiles/testTradition.xml";
 		
 		try {
-			importResource.parseGraphML(filename, "1");
+			importResource.parseGraphML(filename, "1", "Tradition");
 		} catch (FileNotFoundException f) {
 			// this error should not occur
 			assertTrue(false);
@@ -159,7 +155,7 @@ public class TraditionTest {
     	assertEquals(trad1.getId(), firstTradition.getId());
     	assertEquals(trad1.getName(), firstTradition.getName());
     	
-    	TraditionModel lastTradition = traditions.get(traditions.size()-1);
+    	TraditionModel lastTradition = traditions.get(1);
     	assertEquals(trad2.getId(), lastTradition.getId());
     	assertEquals(trad2.getName(), lastTradition.getName());
 	}
@@ -179,8 +175,8 @@ public class TraditionTest {
 				.post(ClientResponse.class, jsonPayload);
 
 		RelationshipModel rel = new RelationshipModel();
-		rel.setSource("16");
-		rel.setTarget("27");
+		rel.setSource("27");
+		rel.setTarget("16");
 		rel.setId("36");
 		rel.setReading_a("april");
 		rel.setIs_significant("no");
@@ -393,7 +389,7 @@ public class TraditionTest {
 		/*
 		 * Change the owner of the tradition 
 		 */
-		TraditionMetadataModel textInfo = new TraditionMetadataModel();
+		TraditionModel textInfo = new TraditionModel();
 		textInfo.setName("RenamedTraditionName");
 		textInfo.setLanguage("nital");
 		textInfo.setIsPublic("0");
@@ -463,7 +459,7 @@ public class TraditionTest {
 		/*
 		 * Change the owner of the tradition 
 		 */
-		TraditionMetadataModel textInfo = new TraditionMetadataModel();
+		TraditionModel textInfo = new TraditionModel();
 		textInfo.setName("RenamedTraditionName");
 		textInfo.setLanguage("nital");
 		textInfo.setIsPublic("0");
@@ -552,7 +548,7 @@ public class TraditionTest {
 		/*
 		 * Change the owner of the tradition 
 		 */
-		TraditionMetadataModel textInfo = new TraditionMetadataModel();
+		TraditionModel textInfo = new TraditionModel();
 		textInfo.setName("RenamedTraditionName");
 		textInfo.setLanguage("nital");
 		textInfo.setIsPublic("0");
@@ -623,26 +619,30 @@ public class TraditionTest {
 	 */
 	@Test
 	public void deleteATraditionWithInvalidIdTest(){
-		ExecutionEngine engine = new ExecutionEngine(db);
-		/*
-		 * Try to remove a tradition with invalid id
-		 */
-		ClientResponse removalResponse = jerseyTest.resource().path("/tradition/deletetradition/withid/1337").delete(ClientResponse.class);
-		assertEquals(Response.Status.NOT_FOUND.getStatusCode(), removalResponse.getStatus());
-		
-		/*
-		 * Test if user 1 still exists
-		 */
-		ExecutionResult result = engine.execute("match (userId:USER {id:'1'}) return userId");
-		Iterator<Node> nodes = result.columnAs("userId");
-		assertTrue(nodes.hasNext());
-		
-    	/*
-    	 * Check if tradition {tradId} still exists
-    	 */
-		result = engine.execute("match (tradId:TRADITION {id:'"+tradId+"'}) return tradId");
-		nodes = result.columnAs("tradId");
-		assertTrue(nodes.hasNext());
+		try(Transaction tx = db.beginTx())
+		{
+			ExecutionEngine engine = new ExecutionEngine(db);
+			/*
+			 * Try to remove a tradition with invalid id
+			 */
+			ClientResponse removalResponse = jerseyTest.resource().path("/tradition/deletetradition/withid/1337").delete(ClientResponse.class);
+			assertEquals(Response.Status.NOT_FOUND.getStatusCode(), removalResponse.getStatus());
+			
+			/*
+			 * Test if user 1 still exists
+			 */
+			ExecutionResult result = engine.execute("match (userId:USER {id:'1'}) return userId");
+			Iterator<Node> nodes = result.columnAs("userId");
+			assertTrue(nodes.hasNext());
+			
+	    	/*
+	    	 * Check if tradition {tradId} still exists
+	    	 */
+			result = engine.execute("match (t:TRADITION {id:'"+tradId+"'}) return t");
+			nodes = result.columnAs("t");
+			assertTrue(nodes.hasNext());
+			tx.success();
+		}
 	}
 	
 	/**

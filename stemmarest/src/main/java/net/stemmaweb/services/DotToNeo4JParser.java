@@ -15,24 +15,11 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 
 /**
- * 
  * This class provides methods for exporting Dot File from Neo4J
- * 
  * @author PSE FS 2015 Team2
- * 
  */
 public class DotToNeo4JParser implements IResource
 {
-	
-	/*
-	 * comment by Jakob
-	 * 
-	 * This change might be ugly. but otherwise 90% of the tests fail. The dbfactory has to be mocked somehow
-	 * and because the this class is constructed within GraphMLToNeo4JParse this does not work at the current state
-	 * 
-	 * this is only a quickfix to get the tests green again. (they are read if you run the neo4j database in background and
-	 * it cant write in the real)
-	 */
 	GraphDatabaseServiceProvider dbServiceProvider = new GraphDatabaseServiceProvider();
 	GraphDatabaseService db = dbServiceProvider.getDatabase();
 	String dot = "";
@@ -44,7 +31,6 @@ public class DotToNeo4JParser implements IResource
 	
 	public Response parseDot(String dot, String tradId)
 	{	
-		//db = dbFactory.newEmbeddedDatabase(DB_PATH);
 		this.dot = dot;
     	
     	try (Transaction tx = db.beginTx()) 
@@ -56,18 +42,11 @@ public class DotToNeo4JParser implements IResource
     			nodes.get(0).createRelationshipTo(nodes.get(1), ERelations.STEMMA);
     		tx.success();
     	}
-    	catch(Exception e)
-    	{
-    		
+    	catch(Exception e) {
     		e.printStackTrace();
     		return Response.status(Status.NOT_FOUND).build();
     	}
-    	finally
-    	{
-    		
-    	}
-		return Response.ok().build();
-
+		return Response.ok(dot).build();
 	}
 	
 	/**

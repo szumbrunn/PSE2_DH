@@ -9,11 +9,10 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 
 /**
- * 
+ * This class is used for debugging purposes only
  * @author PSE FS 2015 Team2
- *
  */
-public class DbPathProblemService {
+public class DebugService {
 
 	public String findPathProblem(String tradId, GraphDatabaseService db) {
 

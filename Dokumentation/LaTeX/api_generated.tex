@@ -1,109 +1,356 @@
+%----------------------------------------------------------------------------------------
+%	CHAPTER 10
+%----------------------------------------------------------------------------------------
+
 \chapter{Services}
 \section{Baseresource: }
 http://localhost:8080/
-\section{/user}
-\textbf{Method Name: }getIt
+\section{/stemma}
+\textbf{Method Name: }getAllStemmata \\ Gets a list of all Stemmata available, as dot format
 \begin{get}
-/
+/getallstemmata/fromtradition/\{tradId\}
 \end{get}
 \begin{response}
- as text/plain
-\end{response}
-\textbf{Method Name: }create
-\begin{post}
-/create
-\end{post}
-\begin{request}
-userModel as application/json
-\end{request}
-\begin{response}
- as application/json
-\end{response}
-\textbf{Method Name: }getUserById
-\begin{get}
-/\{userId\}
-\end{get}
-\begin{response}
- as application/json
-\end{response}
-\textbf{Method Name: }deleteUserById
-\begin{delete}
-/\{userId\}
-\end{delete}
-\begin{response}
- as text/plain
+list of stemmata as dot
 \end{response}
 \begin{parameter}
-userId as string
+tradId as string
 \end{parameter}
-\textbf{Method Name: }getTraditionsByUserId
-\begin{get}
-/traditions/\{userId\}
-\end{get}
+\textbf{Method Name: }setStemma \\ Puts the Stemma of a DOT file in the database
+\begin{post}
+/newstemma/intradition/\{tradId\}
+\end{post}
 \begin{response}
- as application/json
+stemma as dot
 \end{response}
 \begin{parameter}
-userId as string
+tradId as string
+\end{parameter}
+\textbf{Method Name: }reorientStemma \\ Reorients a stemma tree with a given new root node
+\begin{post}
+/reorientstemma/fromtradition/\{tradId\}/withtitle/\{stemmaTitle\}/withnewrootnode/\{nodeId\}
+\end{post}
+\begin{response}
+stemma as dot
+\end{response}
+\begin{parameter}
+tradId as string
+\end{parameter}
+\begin{parameter}
+stemmaTitle as string
+\end{parameter}
+\begin{parameter}
+nodeId as string
+\end{parameter}
+\textbf{Method Name: }getStemma \\ Returns JSON string with a Stemma of a tradition in DOT format
+\begin{get}
+/getstemma/fromtradition/\{tradId\}/withtitle/\{stemmaTitle\}
+\end{get}
+\begin{response}
+stemma as dot
+\end{response}
+\begin{parameter}
+tradId as string
+\end{parameter}
+\begin{parameter}
+stemmaTitle as string
 \end{parameter}
 \section{/relation}
-\textbf{Method Name: }getIt
+\textbf{Method Name: }delete \\ Remove all relationships, as it is done in https://github.com/tla/stemmaweb/blob/master/lib/stemmaweb/Controller/Relation.pm line 271) in Relationships of type RELATIONSHIP between the two nodes.
+\begin{post}
+/deleterelationship/fromtradition/\{tradId\}
+\end{post}
+\begin{request}
+relationshipModel as application/json
+\end{request}
+\begin{response}
+ as text/plain: HTTP Response 404 when no node was found, 200 When relationships where removed
+\end{response}
+\begin{parameter}
+tradId as string
+\end{parameter}
+\textbf{Method Name: }create \\ Creates a new relationship between the two nodes specified.
+\begin{post}
+/createrelationship
+\end{post}
+\begin{request}
+relationshipModel as application/json
+\end{request}
+\begin{response}
+graphModel as application/json
+\end{response}
+\textbf{Method Name: }getAllRelationships \\ Get a list of all relationships from a given tradition.
 \begin{get}
-/
+/getallrelationships/fromtradition/\{tradId\}
 \end{get}
 \begin{response}
- as text/plain
-\end{response}
-\textbf{Method Name: }delete
-\begin{post}
-/\{textId\}/relationships/delete
-\end{post}
-\begin{request}
-relationshipModel as application/json
-\end{request}
-\begin{response}
- as text/plain
+list of relationshipModel as application/json
 \end{response}
 \begin{parameter}
-textId as string
+tradId as string
 \end{parameter}
-\textbf{Method Name: }create
-\begin{post}
-/\{textId\}/relationships
-\end{post}
-\begin{request}
-relationshipModel as application/json
-\end{request}
-\begin{response}
- as application/json
-\end{response}
-\begin{parameter}
-textId as string
-\end{parameter}
-\textbf{Method Name: }deleteById
+\textbf{Method Name: }deleteById \\ Removes a relationship by ID.
 \begin{delete}
-/\{textId\}/relationships/\{relationshipId\}
+/deleterelationshipbyid/withrelationship/\{relationshipId\}
 \end{delete}
 \begin{response}
- as text/plain
+relationshipModel as application/json
 \end{response}
-\begin{parameter}
-textId as string
-\end{parameter}
 \begin{parameter}
 relationshipId as string
 \end{parameter}
-\section{/witness}
-\textbf{Method Name: }getWitnssAsPlainText
+\section{/tradition}
+\textbf{Method Name: }getAllRelationships \\ Gets a list of all relationships of a tradition with the given id.
 \begin{get}
-/string/rank/\{tradId\}/\{textId\}/\{startRank\}/\{endRank\}
+/getallrelationships/fromtradition/\{tradId\}
 \end{get}
 \begin{response}
- as application/json
+list of relationshipModels as application/json
 \end{response}
 \begin{parameter}
-textId as string
+tradId as string
 \end{parameter}
+\textbf{Method Name: }changeTraditionMetadata \\ Changes the metadata of the tradition.
+\begin{post}
+/changemetadata/fromtradition/\{tradId\}
+\end{post}
+\begin{request}
+traditionModel as application/json
+\end{request}
+\begin{response}
+traditionModel as application/json
+\end{response}
+\begin{parameter}
+tradId as string
+\end{parameter}
+\textbf{Method Name: }getAllTraditions \\ Gets a list of all the complete traditions in the database.
+\begin{get}
+/getalltraditions
+\end{get}
+\begin{response}
+list of traditionModels as application/json
+\end{response}
+\textbf{Method Name: }getAllWitnesses \\ Gets a list of all the witnesses of a tradition with the given id.
+\begin{get}
+/getallwitnesses/fromtradition/\{tradId\}
+\end{get}
+\begin{response}
+list of witnessModels as application/json
+\end{response}
+\begin{parameter}
+tradId as string
+\end{parameter}
+\textbf{Method Name: }getTradition \\ Returns GraphML file from specified tradition owned by user
+\begin{get}
+/gettradition/withid/\{tradId\}
+\end{get}
+\begin{response}
+tradition as application/xml (graphML)
+\end{response}
+\begin{parameter}
+tradId as string
+\end{parameter}
+\textbf{Method Name: }deleteTraditionById \\ Removes a complete tradition
+\begin{delete}
+/deletetradition/withid/\{tradId\}
+\end{delete}
+\begin{response}
+ as text/plain: http response
+\end{response}
+\begin{parameter}
+tradId as string
+\end{parameter}
+\textbf{Method Name: }importGraphMl \\ Imports a tradition by given GraphML file and meta data
+\begin{post}
+//newtraditionwithgraphml
+\end{post}
+\begin{request}
+ graphML as multipart/form-data
+\end{request}
+\begin{response}
+the id of the imported tradition as text/plain
+\end{response}
+\textbf{Method Name: }getDot \\ Returns DOT file from specified tradition owned by user
+\begin{get}
+/getdot/fromtradition/\{tradId\}
+\end{get}
+\begin{response}
+ as application/json: XML data
+\end{response}
+\begin{parameter}
+tradId as string
+\end{parameter}
+\section{/reading}
+\textbf{Method Name: }changeReadingProperties \\ Changes properties of a reading according to its keys
+\begin{post}
+/changeproperties/ofreading/\{readId\}
+\end{post}
+\begin{request}
+ ReadingChangePropertyModel as application/json
+\end{request}
+\begin{response}
+readingModel as application/json
+\end{response}
+\begin{parameter}
+readId as long
+\end{parameter}
+\textbf{Method Name: }getReading \\ Returns a single reading by global neo4j id
+\begin{get}
+/getreading/withreadingid/\{readId\}
+\end{get}
+\begin{response}
+readingModel as application/json
+\end{response}
+\begin{parameter}
+readId as long
+\end{parameter}
+\textbf{Method Name: }duplicateReading \\ Duplicates a reading in a specific tradition. Opposite of merge
+\begin{post}
+/duplicatereading
+\end{post}
+\begin{request}
+duplicateModel as application/json
+\end{request}
+\begin{response}
+GraphModel as application/json
+\end{response}
+\textbf{Method Name: }mergeReadings \\ Merges two readings into one single reading in a specific tradition. Opposite of duplicate
+\begin{post}
+/mergereadings/first/\{firstReadId\}/second/\{secondReadId\}
+\end{post}
+\begin{response}
+ as application/json: Status.OK on success or Status.INTERNAL\_SERVER\_ERROR with a detailed message.
+\end{response}
+\begin{parameter}
+secondReadId as long
+\end{parameter}
+\begin{parameter}
+firstReadId as long
+\end{parameter}
+\textbf{Method Name: }splitReading \\ Splits up a single reading into several ones in a specific tradition. Opposite of compress
+\begin{post}
+/splitreading/ofreading/\{readId\}/withsplitindex/\{splitIndex\}
+\end{post}
+\begin{request}
+ as text/plain
+\end{request}
+\begin{response}
+GraphModel as application/json
+\end{response}
+\begin{parameter}
+readId as long
+\end{parameter}
+\begin{parameter}
+splitIndex as int
+\end{parameter}
+\textbf{Method Name: }getNextReadingInWitness \\ gets the next readings from a given readings in the same witness
+\begin{get}
+/getnextreading/fromwitness/\{witnessId\}/ofreading/\{readId\}
+\end{get}
+\begin{response}
+readingModel as application/json
+\end{response}
+\begin{parameter}
+readId as long
+\end{parameter}
+\begin{parameter}
+witnessId as string
+\end{parameter}
+\textbf{Method Name: }getPreviousReadingInWitness \\ gets the previous readings from a given readings in the same witness
+\begin{get}
+/getpreviousreading/fromwitness/\{witnessId\}/ofreading/\{readId\}
+\end{get}
+\begin{response}
+readingModel as application/json
+\end{response}
+\begin{parameter}
+readId as long
+\end{parameter}
+\begin{parameter}
+witnessId as string
+\end{parameter}
+\textbf{Method Name: }getAllReadings \\ Returns a list of all readings in a tradition
+\begin{get}
+/getallreadings/fromtradition/\{tradId\}
+\end{get}
+\begin{response}
+list of readingModels as application/json
+\end{response}
+\begin{parameter}
+tradId as string
+\end{parameter}
+\textbf{Method Name: }getIdenticalReadings \\ Get all readings which have the same text and the same rank between given ranks
+\begin{get}
+/getidenticalreadings/fromtradition/\{tradId\}/fromstartrank/\{startRank\}/toendrank/\{endRank\}
+\end{get}
+\begin{response}
+list of list of readingModels as application/json
+\end{response}
+\begin{parameter}
+endRank as long
+\end{parameter}
+\begin{parameter}
+tradId as string
+\end{parameter}
+\begin{parameter}
+startRank as long
+\end{parameter}
+\textbf{Method Name: }getCouldBeIdenticalReadings \\ Returns a list of a list of readingModels with could be one the same rank without problems
+\begin{get}
+/couldbeidenticalreadings/fromtradition/\{tradId\}/fromstartrank/\{startRank\}/toendrank/\{endRank\}
+\end{get}
+\begin{response}
+list of readingModels as application/json
+\end{response}
+\begin{parameter}
+endRank as long
+\end{parameter}
+\begin{parameter}
+tradId as string
+\end{parameter}
+\begin{parameter}
+startRank as long
+\end{parameter}
+\textbf{Method Name: }compressReadings \\ Compress two readings into one. Texts will be concatenated together (with or without a space or extra text. The reading with the lower rank will be given first. Opposite of split
+\begin{post}
+/compressreadings/read1id/\{read1Id\}/read2id/\{read2Id\}/concatenate/\{con\}
+\end{post}
+\begin{request}
+ as text/plain
+\end{request}
+\begin{response}
+ as application/json: status.ok if compress was successful. Status.INTERNAL\_SERVER\_ERROR with a detailed message if not concatenated
+\end{response}
+\begin{parameter}
+read1Id as long
+\end{parameter}
+\begin{parameter}
+read2Id as long
+\end{parameter}
+\begin{parameter}
+con as string
+\end{parameter}
+\section{/witness}
+\textbf{Method Name: }getWitnessAsText \\ finds a witness in the database and returns it as a string
+\begin{get}
+/gettext/fromtradition/\{tradId\}/ofwitness/\{witnessId\}
+\end{get}
+\begin{response}
+witness as string
+\end{response}
+\begin{parameter}
+tradId as string
+\end{parameter}
+\begin{parameter}
+witnessId as string
+\end{parameter}
+\textbf{Method Name: }getWitnessAsTextBetweenRanks \\ find a requested witness in the data base and return it as a string according to define start and end readings (including the readings in those ranks). if end-rank is too high or start-rank too low will return till the end/from the start of the witness
+\begin{get}
+/gettext/fromtradition/\{tradId\}/ofwitness/\{witnessId\}/fromstartrank/\{startRank\}/toendrank/\{endRank\}
+\end{get}
+\begin{response}
+witness as string
+\end{response}
 \begin{parameter}
 endRank as string
 \end{parameter}
@@ -113,268 +360,107 @@ tradId as string
 \begin{parameter}
 startRank as string
 \end{parameter}
-\textbf{Method Name: }getWitnessAsPlainText
+\begin{parameter}
+witnessId as string
+\end{parameter}
+\textbf{Method Name: }getWitnessAsReadings \\ finds a witness in the database and returns it as a list of readings
 \begin{get}
-/string/\{tradId\}/\{textId\}
+/getreadinglist/fromtradition/\{tradId\}/ofwitness/\{witnessId\}
 \end{get}
 \begin{response}
- as application/json
-\end{response}
-\begin{parameter}
-textId as string
-\end{parameter}
-\begin{parameter}
-tradId as string
-\end{parameter}
-\textbf{Method Name: }getWitnessAsReadings
-\begin{get}
-/list/\{tradId\}/\{textId\}
-\end{get}
-\begin{response}
- as application/json
-\end{response}
-\begin{parameter}
-textId as string
-\end{parameter}
-\begin{parameter}
-tradId as string
-\end{parameter}
-\textbf{Method Name: }getNextReadingInWitness
-\begin{get}
-/reading/next/\{tradId\}/\{textId\}/\{readId\}
-\end{get}
-\begin{response}
- as application/json
-\end{response}
-\begin{parameter}
-textId as string
-\end{parameter}
-\begin{parameter}
-readId as long
-\end{parameter}
-\begin{parameter}
-tradId as string
-\end{parameter}
-\textbf{Method Name: }getPreviousReadingInWitness
-\begin{get}
-/reading/previous/\{tradId\}/\{textId\}/\{readId\}
-\end{get}
-\begin{response}
- as application/json
-\end{response}
-\begin{parameter}
-textId as string
-\end{parameter}
-\begin{parameter}
-readId as long
-\end{parameter}
-\begin{parameter}
-tradId as string
-\end{parameter}
-\section{/tradition}
-\textbf{Method Name: }getAllRelationships
-\begin{get}
-/relation/\{tradId\}/relationships
-\end{get}
-\begin{response}
- as application/json
+list of readingModels as application/json
 \end{response}
 \begin{parameter}
 tradId as string
 \end{parameter}
-\textbf{Method Name: }deleteUserById
+\begin{parameter}
+witnessId as string
+\end{parameter}
+\section{/user}
+\textbf{Method Name: }create \\ Creates a user based on the parameters submitted in JSON.
+\begin{post}
+/createuser
+\end{post}
+\begin{request}
+userModel as application/json
+\end{request}
+\begin{response}
+userModel as application/json
+\end{response}
+\textbf{Method Name: }getUserById \\ Gets a user by the id.
+\begin{get}
+/getuser/withid/\{userId\}
+\end{get}
+\begin{response}
+userModel as application/json
+\end{response}
+\begin{parameter}
+userId as string
+\end{parameter}
+\textbf{Method Name: }deleteUserById \\ Removes a user and all his traditions
 \begin{delete}
-/\{tradId\}
+/deleteuser/withid/\{userId\}
 \end{delete}
 \begin{response}
- as text/plain
+ as text/plain: OK on success or an ERROR in JSON format
 \end{response}
 \begin{parameter}
-tradId as string
+userId as string
 \end{parameter}
-\textbf{Method Name: }changeOwnerOfATradition
-\begin{post}
-/\{textId\}
-\end{post}
-\begin{request}
-textInfoModel as application/json
-\end{request}
-\begin{response}
- as application/json
-\end{response}
-\begin{parameter}
-textId as string
-\end{parameter}
-\textbf{Method Name: }getReading
+\textbf{Method Name: }getTraditionsByUserId \\ Get all Traditions of a user
 \begin{get}
-/reading/\{tradId\}/\{readId\}
+/gettraditions/ofuser/\{userId\}
 \end{get}
 \begin{response}
- as application/json
+ as application/json: OK on success or an ERROR in JSON format
 \end{response}
 \begin{parameter}
-readId as long
+userId as string
 \end{parameter}
-\begin{parameter}
-tradId as string
-\end{parameter}
-\textbf{Method Name: }getAllTraditions
-\begin{get}
-/all
-\end{get}
-\begin{response}
- as application/json
-\end{response}
-\textbf{Method Name: }duplicateReading
-\begin{post}
-/duplicate/\{tradId\}
-\end{post}
-\begin{request}
-duplicateModel as application/json
-\end{request}
-\begin{response}
- as application/json
-\end{response}
-\begin{parameter}
-tradId as string
-\end{parameter}
-\textbf{Method Name: }mergeReadings
-\begin{post}
-/merge/\{tradId\}/\{firstReadId\}/\{secondReadId\}
-\end{post}
-\begin{response}
- as application/json
-\end{response}
-\begin{parameter}
-secondReadId as long
-\end{parameter}
-\begin{parameter}
-tradId as string
-\end{parameter}
-\begin{parameter}
-firstReadId as long
-\end{parameter}
-\textbf{Method Name: }splitReading
-\begin{post}
-/split/\{tradId\}/\{readId\}
-\end{post}
-\begin{response}
- as application/json
-\end{response}
-\begin{parameter}
-readId as long
-\end{parameter}
-\begin{parameter}
-tradId as string
-\end{parameter}
-\textbf{Method Name: }getAllWitnesses
-\begin{get}
-/witness/\{tradId\}
-\end{get}
-\begin{response}
- as application/json
-\end{response}
-\begin{parameter}
-tradId as string
-\end{parameter}
-\textbf{Method Name: }getTradition
-\begin{get}
-/get/\{tradId\}
-\end{get}
-\begin{response}
- as application/json
-\end{response}
-\begin{parameter}
-tradId as string
-\end{parameter}
-\textbf{Method Name: }importGraphMl
-\begin{post}
-/new
-\end{post}
-\begin{request}
- as multipart/form-data
-\end{request}
-\begin{response}
- as application/json
-\end{response}
-\textbf{Method Name: }getAllReadingsOfTradition
-\begin{get}
-/readings/\{tradId\}
-\end{get}
-\begin{response}
- as application/json
-\end{response}
-\begin{parameter}
-tradId as string
-\end{parameter}
-\textbf{Method Name: }getDot
-\begin{get}
-/getdot/\{tradId\}
-\end{get}
-\begin{response}
- as application/json
-\end{response}
-\begin{parameter}
-tradId as string
-\end{parameter}
-\section{/myresource}
-\textbf{Method Name: }getIt
-\begin{get}
-/
-\end{get}
-\begin{response}
- as text/plain
-\end{response}
+
+
+%----------------------------------------------------------------------------------------
+%	CHAPTER 11
+%----------------------------------------------------------------------------------------
+
 \chapter{Models}
-\section{userModel}
-\begin{property}
-id as string
-\end{property}
-\begin{property}
-isAdmin as string
-\end{property}
+
 \section{relationshipModel}
 \begin{property}
-de0 as string
+a\_derivable\_from\_b as string
 \end{property}
 \begin{property}
-de1 as string
+alters\_meaning as string
 \end{property}
 \begin{property}
-de10 as string
+annotation as string
 \end{property}
 \begin{property}
-de11 as string
+b\_derivable\_from\_a as string
 \end{property}
 \begin{property}
-de12 as string
+displayform as string
 \end{property}
 \begin{property}
-de2 as string
-\end{property}
-\begin{property}
-de3 as string
-\end{property}
-\begin{property}
-de4 as string
-\end{property}
-\begin{property}
-de5 as string
-\end{property}
-\begin{property}
-de6 as string
-\end{property}
-\begin{property}
-de7 as string
-\end{property}
-\begin{property}
-de8 as string
-\end{property}
-\begin{property}
-de9 as string
+extra as string
 \end{property}
 \begin{property}
 id as string
+\end{property}
+\begin{property}
+is\_significant as string
+\end{property}
+\begin{property}
+non\_independent as string
+\end{property}
+\begin{property}
+reading\_a as string
+\end{property}
+\begin{property}
+reading\_b as string
+\end{property}
+\begin{property}
+scope as string
 \end{property}
 \begin{property}
 source as string
@@ -382,14 +468,65 @@ source as string
 \begin{property}
 target as string
 \end{property}
-\section{duplicateModel}
 \begin{property}
-readings as long
+type as string
 \end{property}
 \begin{property}
-witnesses as string
+witness as string
 \end{property}
-\section{textInfoModel}
+\section{readingModel}
+\begin{property}
+grammar\_invalid as string
+\end{property}
+\begin{property}
+id as string
+\end{property}
+\begin{property}
+is\_common as string
+\end{property}
+\begin{property}
+is\_end as string
+\end{property}
+\begin{property}
+is\_lacuna as string
+\end{property}
+\begin{property}
+is\_lemma as string
+\end{property}
+\begin{property}
+is\_nonsense as string
+\end{property}
+\begin{property}
+is\_ph as string
+\end{property}
+\begin{property}
+is\_start as string
+\end{property}
+\begin{property}
+join\_next as string
+\end{property}
+\begin{property}
+join\_prior as string
+\end{property}
+\begin{property}
+language as string
+\end{property}
+\begin{property}
+lexemes as string
+\end{property}
+\begin{property}
+normal\_form as string
+\end{property}
+\begin{property}
+rank as long
+\end{property}
+\begin{property}
+text as string
+\end{property}
+\section{traditionModel}
+\begin{property}
+id as string
+\end{property}
 \begin{property}
 isPublic as string
 \end{property}
@@ -401,4 +538,44 @@ name as string
 \end{property}
 \begin{property}
 ownerId as string
+\end{property}
+\section{duplicateModel}
+\begin{property}
+readings as long
+\end{property}
+\begin{property}
+witnesses as string
+\end{property}
+\section{graphModel}
+\begin{property}
+readings as long
+\end{property}
+\begin{property}
+witnesses as string
+\end{property}
+\section{witnessModel}
+\begin{property}
+id as string
+\end{property}
+\section{userModel}
+\begin{property}
+id as string
+\end{property}
+\begin{property}
+isAdmin as string
+\end{property}
+\section{ReadingChangePropertyModel}
+\begin{property}
+properties as list of KeyPropertyModels
+\end{property}
+\section{stemma}
+A tree that provides an overview over the witnesses of a tradition. The relations between the witnesses which are displayed as nodes is central. Here the stemmata are mostly returned in dot format.
+\section{GraphML}
+\url{http://de.wikipedia.org/wiki/GraphML}
+\section{KeyPropertyModel}
+\begin{property}
+key as string
+\end{property}
+\begin{property}
+property as string
 \end{property}

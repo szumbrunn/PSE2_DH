@@ -16,8 +16,6 @@ import net.stemmaweb.stemmaserver.OSDetector;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.runners.MockitoJUnitRunner;
 import org.neo4j.cypher.javacompat.ExecutionEngine;
 import org.neo4j.cypher.javacompat.ExecutionResult;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -29,7 +27,6 @@ import org.neo4j.graphdb.Transaction;
  * @author PSE FS 2015 Team2
  *
  */
-@RunWith(MockitoJUnitRunner.class)
 public class DatabaseServiceTest {
 	
 	String tradId;
@@ -37,8 +34,6 @@ public class DatabaseServiceTest {
 	GraphDatabaseService db;
 
 	private GraphMLToNeo4JParser importResource;
-	private DatabaseService service;
-
 
 	@Before
 	public void setUp() throws Exception {
@@ -48,7 +43,6 @@ public class DatabaseServiceTest {
 		db = new GraphDatabaseServiceProvider().getDatabase();
 		
 		importResource = new GraphMLToNeo4JParser();
-		service = new DatabaseService(db);
 		
 		String filename = "";
 		if(OSDetector.isWin())
@@ -83,7 +77,7 @@ public class DatabaseServiceTest {
 		 * load a tradition to the test DB
 		 */
 		try {
-			importResource.parseGraphML(filename, "1");
+			importResource.parseGraphML(filename, "1", "Tradition");
 		} catch (FileNotFoundException f) {
 			// this error should not occur
 			assertTrue(false);
@@ -100,15 +94,13 @@ public class DatabaseServiceTest {
 
 			tx.success();
 		}
-		
-		service = new DatabaseService(db);
 	}
 	
 	@Test
 	public void getStartNodeTest(){
 		try(Transaction tx = db.beginTx())
 		{
-			assertEquals("#START#", service.getStartNode("1001").getProperty("text").toString());
+			assertEquals("#START#", DatabaseService.getStartNode("1001",db).getProperty("text").toString());
 		}
 	}
 	

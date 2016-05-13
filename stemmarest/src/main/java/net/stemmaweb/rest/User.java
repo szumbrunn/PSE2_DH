@@ -31,36 +31,27 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.traversal.Uniqueness;
 
 /**
- * 
- * Comprises all the api calls related to a user.
- * 
+ * Comprises all the API calls related to a user.
+ * Can be called using http://BASE_URL/user
  * @author PSE FS 2015 Team2
- * 
  */
+
 @Path("/user")
 public class User implements IResource {
 	GraphDatabaseServiceProvider dbServiceProvider = new GraphDatabaseServiceProvider();
 	GraphDatabaseService db = dbServiceProvider.getDatabase();
-	
-
-	@GET
-	public String getIt() {
-		return "User!";
-	}
-
 
 	/**
 	 * Creates a user based on the parameters submitted in JSON.
 	 * 
 	 * @param userModel
 	 *            in JSON Format
-	 * @return OK on success or an ERROR as JSON
+	 * @return a userModel in JSON on success or an ERROR in JSON format
 	 */
 	@POST
 	@Path("createuser")
 	@Consumes(MediaType.APPLICATION_JSON)
 	public Response create(UserModel userModel) {
-
 		
 		if (DatabaseService.checkIfUserExists(userModel.getId(),db)) {
 			
@@ -82,17 +73,15 @@ public class User implements IResource {
 			tx.success();
 		} catch (Exception e) {
 			return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-		} finally {
-			
-		}
-		return Response.status(Response.Status.CREATED).build();
+		} 
+		return Response.status(Response.Status.CREATED).entity(userModel).build();
 	}
 
 	/**
 	 * Gets a user by the id.
 	 * 
 	 * @param userId
-	 * @return UserModel as JSON
+	 * @return UserModel as JSON or an ERROR in JSON format
 	 */
 	@GET
 	@Path("getuser/withid/{userId}")
@@ -111,21 +100,20 @@ public class User implements IResource {
 				userModel.setId((String) node.getProperty("id"));
 				userModel.setIsAdmin((String) node.getProperty("isAdmin"));
 			} else {
-				return null;
+				return Response.status(Status.NO_CONTENT).build();
 			}
 			tx.success();
 		} catch (Exception e) {
 			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
-		} finally { 
-			
-		}
+		} 
 		return Response.ok(userModel).build();
 	}
 	
 	/**
 	 * Removes a user and all his traditions
+	 * 
 	 * @param userId
-	 * @return
+	 * @return OK on success or an ERROR in JSON format
 	 */
 	@DELETE
 	@Path("deleteuser/withid/{userId}")
@@ -176,24 +164,21 @@ public class User implements IResource {
 			tx.success();
 		} catch (Exception e) {
 			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
-		} finally {
-			
-		}
+		} 
 		return Response.status(Response.Status.OK).build();
 	}
 
 	/**
-	 * Get all Traditions of a user 
+	 * Get all Traditions of a user
 	 * 
 	 * @param userId
-	 * @return
+	 * @return OK on success or an ERROR in JSON format
 	 */
 	@GET
 	@Path("gettraditions/ofuser/{userId}")
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response getTraditionsByUserId(@PathParam("userId") String userId) {
 
-		
 		ArrayList<TraditionModel> traditions = new ArrayList<TraditionModel>();
 		
 		if (!DatabaseService.checkIfUserExists(userId, db)) {
@@ -210,6 +195,7 @@ public class User implements IResource {
 				if (tradIterator.hasNext()) {
 					Node tradNode = tradIterator.next();
 					TraditionModel tradition = new TraditionModel();
+					
 					tradition.setId(tradNode.getProperty("id").toString());
 					tradition.setName(tradNode.getProperty("name").toString());
 					traditions.add(tradition);

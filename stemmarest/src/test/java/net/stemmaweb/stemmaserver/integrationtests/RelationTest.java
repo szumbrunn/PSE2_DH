@@ -12,8 +12,8 @@ import java.util.List;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import net.stemmaweb.model.GraphModel;
 import net.stemmaweb.model.RelationshipModel;
-import net.stemmaweb.model.ReturnIdModel;
 import net.stemmaweb.rest.ERelations;
 import net.stemmaweb.rest.Nodes;
 import net.stemmaweb.rest.Relation;
@@ -26,8 +26,6 @@ import net.stemmaweb.stemmaserver.OSDetector;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.runners.MockitoJUnitRunner;
 import org.neo4j.cypher.javacompat.ExecutionEngine;
 import org.neo4j.cypher.javacompat.ExecutionResult;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -48,7 +46,6 @@ import com.sun.jersey.test.framework.JerseyTest;
  * @author PSE FS 2015 Team2
  *
  */
-@RunWith(MockitoJUnitRunner.class)
 public class RelationTest {
 	private String tradId;
 
@@ -110,7 +107,7 @@ public class RelationTest {
 		 * load a tradition to the test DB
 		 */
 		try {
-			importResource.parseGraphML(filename, "1");
+			importResource.parseGraphML(filename, "1", "Tradition");
 		} catch (FileNotFoundException f) {
 			// this error should not occur
 			assertTrue(false);
@@ -135,19 +132,10 @@ public class RelationTest {
 	}
 	
 	/**
-	 * Test if the Resource is up and running
-	 */
-	@Test
-	public void SimpleTest(){
-		String actualResponse = jerseyTest.resource().path("/relation").get(String.class);
-		assertEquals("The relation api is up and running",actualResponse);
-	}
-	
-	/**
 	 * Test if a relation is created properly
 	 */
 	@Test
-	public void createRelationshipTestDH41(){
+	public void createRelationshipTest() {
 		RelationshipModel relationship = new RelationshipModel();
 		String relationshipId = "";
 		relationship.setSource("16");
@@ -163,7 +151,9 @@ public class RelationTest {
 		
     	try (Transaction tx = db.beginTx()) 
     	{
-    		relationshipId = actualResponse.getEntity(ReturnIdModel.class).getId();
+			GraphModel readingsAndRelationships = actualResponse
+					.getEntity(GraphModel.class);
+			relationshipId = readingsAndRelationships.getRelationships().get(0).getId();
     		Relationship loadedRelationship = db.getRelationshipById(Long.parseLong(relationshipId));
     		
     		assertEquals(16L, loadedRelationship.getStartNode().getId());
@@ -180,7 +170,7 @@ public class RelationTest {
 	 * Test if an 404 error occurs when an invalid target node was tested
 	 */
 	@Test
-	public void createRelationshipWithInvalidTargetIdTestDH41(){
+	public void createRelationshipWithInvalidTargetIdTest() {
 		RelationshipModel relationship = new RelationshipModel();
 
 		relationship.setSource("16");
@@ -199,7 +189,7 @@ public class RelationTest {
 	 * Test if an 404 error occurs when an invalid source node was tested
 	 */
 	@Test
-	public void createRelationshipWithInvalidSourceIdTestDH41(){
+	public void createRelationshipWithInvalidSourceIdTest() {
 		RelationshipModel relationship = new RelationshipModel();
 
 		relationship.setSource("1337");
@@ -218,7 +208,7 @@ public class RelationTest {
 	 * Test the removal method DELETE /relationship/{tradidtionId}/relationships/{relationshipId}
 	 */
 	@Test(expected=NotFoundException.class)
-	public void deleteRelationshipTestDH43(){
+	public void deleteRelationshipTest() {
 		/*
 		 * Create a relationship
 		 */
@@ -235,9 +225,13 @@ public class RelationTest {
 		
 		
 		ClientResponse actualResponse = jerseyTest.resource().path("/relation/createrelationship").type(MediaType.APPLICATION_JSON).post(ClientResponse.class,relationship);
-		relationshipId = actualResponse.getEntity(ReturnIdModel.class).getId();
+		GraphModel readingsAndRelationships = actualResponse.getEntity(
+				GraphModel.class);
+		relationshipId = readingsAndRelationships.getRelationships().get(0).getId();
 		
-		ClientResponse removalResponse = jerseyTest.resource().path("/relation/deleterelationshipsbyid/withrelationship/"+relationshipId).delete(ClientResponse.class);
+		ClientResponse removalResponse = jerseyTest.resource()
+				.path("/relation/deleterelationshipbyid/withrelationship/" + relationshipId)
+				.delete(ClientResponse.class);
 		assertEquals(Response.Status.OK.getStatusCode(), removalResponse.getStatus());
 		
 		try (Transaction tx = db.beginTx())
@@ -248,7 +242,7 @@ public class RelationTest {
 	
 	//also tests the delete method: with the testTradition
 	@Test
-	public void deleteRealtionsTest(){
+	public void deleteRelationsTest(){
 		
 		try (Transaction tx = db.beginTx()) {
 			
@@ -267,13 +261,13 @@ public class RelationTest {
 					rel = tempRel;
 					relCounter++;
 			}
-			//checks that the correcht realtionship has been found
+			//checks that the correct realtionship has been found
 			assertEquals(1, relCounter);
 			assertEquals(march2.getId(), rel.getOtherNode(march1).getId());
 			
 			ClientResponse removalResponse = jerseyTest
 					.resource()
-					.path("/relation/deleterelationshipsbyid/withrelationship/" + rel.getId())
+					.path("/relation/deleterelationshipbyid/withrelationship/" + rel.getId())
 					.delete(ClientResponse.class);
 			assertEquals(Response.Status.OK.getStatusCode(), removalResponse.getStatus());
 
@@ -286,9 +280,12 @@ public class RelationTest {
 			assertFalse(nodes.hasNext());
 			
 			relCounter = 0;
-			for (Relationship tempRel : march1.getRelationships(ERelations.RELATIONSHIP)) {
+			Iterator<Relationship> relationships = march1.getRelationships(ERelations.RELATIONSHIP).iterator();
+			while(relationships.hasNext()){
 				relCounter++;
-		}
+				relationships.next();
+			}
+			
 			assertEquals(0, relCounter);
 			String expectedText = "{\"text\":\"when april with his showers sweet with "
 					+ "fruit the drought of march has pierced unto the root\"}";
@@ -309,8 +306,9 @@ public class RelationTest {
 	 * Try to delete a relationship that does not exist
 	 */
 	@Test
-	public void deleteRelationshipThatDoesNotExistTestDH43(){
-		ClientResponse removalResponse = jerseyTest.resource().path("/relation/deleterelationshipsbyid/withrelationship/1337").delete(ClientResponse.class);
+	public void deleteRelationshipThatDoesNotExistTest() {
+		ClientResponse removalResponse = jerseyTest.resource()
+				.path("/relation/deleterelationshipbyid/withrelationship/1337").delete(ClientResponse.class);
 		assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), removalResponse.getStatus());
 	}
 	
@@ -318,7 +316,7 @@ public class RelationTest {
 	 * Test the removal method by posting two nodes to /relation/{witnessId}/relationships/delete
 	 */
 	@Test(expected=NotFoundException.class)
-	public void deleteRelationshipTestdeleteAllDH43(){
+	public void deleteRelationshipTestdeleteAll() {
 		/*
 		 * Create two relationships between two nodes
 		 */
@@ -335,7 +333,9 @@ public class RelationTest {
 		relationship.setScope("local");
 		
 		ClientResponse actualResponse1 = jerseyTest.resource().path("/relation/createrelationship").type(MediaType.APPLICATION_JSON).post(ClientResponse.class,relationship);
-		relationshipId1 = actualResponse1.getEntity(ReturnIdModel.class).getId();
+		GraphModel readingsAndRelationships1 = actualResponse1
+				.getEntity(GraphModel.class);
+		relationshipId1 = readingsAndRelationships1.getRelationships().get(0).getId();
 		
 		relationship = new RelationshipModel();
 		relationship.setSource("16");
@@ -348,7 +348,9 @@ public class RelationTest {
 		relationship.setScope("local");
 		
 		ClientResponse actualResponse2 = jerseyTest.resource().path("/relation/createrelationship").type(MediaType.APPLICATION_JSON).post(ClientResponse.class,relationship);
-		relationshipId2 = actualResponse2.getEntity(ReturnIdModel.class).getId();
+		GraphModel readingsAndRelationships2 = actualResponse2
+				.getEntity(GraphModel.class);
+		relationshipId2 = readingsAndRelationships2.getRelationships().get(0).getId();
 		
 		/*
 		 * Create the model to delete
@@ -370,7 +372,7 @@ public class RelationTest {
 	
 	
 	@Test(expected=NotFoundException.class)
-	public void deleteRelationshipDocumentWideTestDH43(){
+	public void deleteRelationshipDocumentWideTest() {
 		/*
 		 * Create a relationship
 		 */
@@ -387,7 +389,9 @@ public class RelationTest {
 		relationship.setScope("local");
 		
 		ClientResponse actualResponse = jerseyTest.resource().path("/relation/createrelationship").type(MediaType.APPLICATION_JSON).post(ClientResponse.class,relationship);
-		relationshipId1 = actualResponse.getEntity(ReturnIdModel.class).getId();
+		GraphModel readingsAndRelationships1 = actualResponse
+				.getEntity(GraphModel.class);
+		relationshipId1 = readingsAndRelationships1.getRelationships().get(0).getId();
 		
 		relationship.setSource("27");
 		relationship.setTarget("17");
@@ -400,7 +404,9 @@ public class RelationTest {
 		
 		
 		actualResponse = jerseyTest.resource().path("/relation/createrelationship").type(MediaType.APPLICATION_JSON).post(ClientResponse.class,relationship);
-		relationshipId2 = actualResponse.getEntity(ReturnIdModel.class).getId();
+		GraphModel readingsAndRelationships2 = actualResponse
+				.getEntity(GraphModel.class);
+		relationshipId2 = readingsAndRelationships2.getRelationships().get(0).getId();
 		
 		relationship.setScope("document");
 		
@@ -424,7 +430,7 @@ public class RelationTest {
 	 * Test that cross relations may not be made
 	 */
 	@Test
-	public void createRelationshipTestWithCrossRelationConstraintDH39(){
+	public void createRelationshipTestWithCrossRelationConstraint() {
 		RelationshipModel relationship = new RelationshipModel();
 		relationship.setSource("6");
 		relationship.setTarget("20");
@@ -466,7 +472,7 @@ public class RelationTest {
 	}
 	
 	@Test
-	public void createRelationshipTestWithCrossRelationConstraintDH39NotDirectlyCloseToEachOther(){
+	public void createRelationshipTestWithCrossRelationConstraintNotDirectlyCloseToEachOther() {
 		RelationshipModel relationship = new RelationshipModel();
 		relationship.setSource("6");
 		relationship.setTarget("20");
@@ -527,7 +533,7 @@ public class RelationTest {
 	}
 
 	@Test
-	public void createRelationshipTestWithCyclicConstraintDH39() {
+	public void createRelationshipTestWithCyclicConstraint() {
 		RelationshipModel relationship = new RelationshipModel();
 
 		ExecutionEngine engine = new ExecutionEngine(db);
@@ -627,7 +633,7 @@ public class RelationTest {
 		else
 			filename = "src/TestXMLFiles/testTraditionNoRealtions.xml";
 		try {
-			importResource.parseGraphML(filename, "1");
+			importResource.parseGraphML(filename, "1", "Tradition");
 		} catch (FileNotFoundException f) {
 			// this error should not occur
 			assertTrue(false);

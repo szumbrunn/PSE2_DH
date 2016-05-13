@@ -18,14 +18,11 @@ import net.stemmaweb.stemmaserver.OSDetector;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.runners.MockitoJUnitRunner;
 import org.neo4j.cypher.javacompat.ExecutionEngine;
 import org.neo4j.cypher.javacompat.ExecutionResult;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.ResourceIterable;
-import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.graphdb.Transaction;
 
 /**
@@ -33,7 +30,6 @@ import org.neo4j.graphdb.Transaction;
  * @author PSE FS 2015 Team2
  *
  */
-@RunWith(MockitoJUnitRunner.class)
 public class Neo4JAndGraphMLParserUnitTest {
 
 	GraphDatabaseService db;
@@ -89,7 +85,7 @@ public class Neo4JAndGraphMLParserUnitTest {
 			filename = "src/TestXMLFiles/SapientiaFileNotExisting.xml";
 		try
 		{
-			Response actualResponse = importResource.parseGraphML(filename, "1");
+			importResource.parseGraphML(filename, "1", "Tradition");
 			
 			assertTrue(false); // This line of code should never execute
 		}
@@ -113,7 +109,7 @@ public class Neo4JAndGraphMLParserUnitTest {
 			filename = "src/TestXMLFiles/SapientiaWithError.xml";
 		try
 		{
-			actualResponse = importResource.parseGraphML(filename, "1");
+			actualResponse = importResource.parseGraphML(filename, "1", "Tradition");
 		}
 		catch(FileNotFoundException f)
 		{
@@ -138,7 +134,7 @@ public class Neo4JAndGraphMLParserUnitTest {
 			filename = "src/TestXMLFiles/testTradition.xml";
 		try
 		{
-			actualResponse = importResource.parseGraphML(filename, "1");
+			actualResponse = importResource.parseGraphML(filename, "1", "Tradition");
 		}
 		catch(FileNotFoundException f)
 		{
@@ -150,7 +146,6 @@ public class Neo4JAndGraphMLParserUnitTest {
 				actualResponse.getStatus());
 		
 		traditionNodeExistsTest();
-		traditionEndNodeExistsTest();
 	}
 	
 	/**
@@ -164,17 +159,6 @@ public class Neo4JAndGraphMLParserUnitTest {
 			assertTrue(tradNodesIt.hasNext());
 			tx.success();
     	}
-	}
-	
-	/**
-	 * test if the tradition end node exists
-	 */
-	public void traditionEndNodeExistsTest(){
-		ExecutionEngine engine = new ExecutionEngine(db);
-		
-		ExecutionResult result = engine.execute("match (e)-[:NORMAL]->(n:WORD) where n.text='#END#' return n");
-		ResourceIterator<Node> tradNodes = result.columnAs("n");
-		assertTrue(tradNodes.hasNext());
 	}
 	
 	/**
@@ -210,7 +194,7 @@ public class Neo4JAndGraphMLParserUnitTest {
 			filename = "src/TestXMLFiles/testTradition.xml";
 		try
 		{
-			importResource.parseGraphML(filename, "1");
+			importResource.parseGraphML(filename, "1", "Tradition");
 		}
 		catch(FileNotFoundException f)
 		{
@@ -238,7 +222,7 @@ public class Neo4JAndGraphMLParserUnitTest {
 		Response actualResponse = null;
 		try
 		{
-			actualResponse = importResource.parseGraphML(filename, "1");
+			actualResponse = importResource.parseGraphML(filename, "1", "Tradition");
 		}
 		catch(FileNotFoundException f)
 		{
@@ -250,7 +234,6 @@ public class Neo4JAndGraphMLParserUnitTest {
 				actualResponse.getStatus());
 		
 		traditionNodeExistsTest();
-		traditionEndNodeExistsTest();
 	}
 	
 }
